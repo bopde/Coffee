@@ -39,7 +39,7 @@
 <script>
 /* Service worker for offline caching */
 if('serviceWorker'in navigator){
-  const sw=`const V='cc-v5';
+  const sw=`const V='cc-v6';
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.add(location.href)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(clients.claim())});
 self.addEventListener('fetch',e=>{
@@ -59,58 +59,59 @@ self.addEventListener('fetch',e=>{
 </script>
 
 <script type="text/babel">
-const {useState,useEffect,useCallback,useMemo}=React;
+const {useState,useEffect,useMemo}=React;
 
 // ═══════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════
 const LOGO    = "https://raw.githubusercontent.com/bopde/Kai-Ika-report/main/KAI-IKA_log_white-on-trans01.png";
 const URL_KEY = "ccWebAppUrl";
-const EV_KEY  = "ccEvent_v3";   // schema unchanged from v3/v4
-const HOURLY  = 30;
+const EV_KEY  = "ccEvent_v3";
+const HOURLY  = 30; // staff cost per hour ($)
 
-const STAFF = ["Ben","Connor","Dave","Opu","Matt","Jay","Xavier","Volunteer","Other"];
+const STAFF = ["Ben","Matt","Xavier","Connor","Volunteer"];
 
+// Canonical stock item names — Title Case, Rg/Lg for cup sizes
 const STOCK_ITEMS = [
-  "Cup - Lg","Cup - Sm","Milk - Cow 2L","Milk - Oat 1L",
-  "Beans - 1kg","Chocolate powder - bag","Chocolate sauce - 500ml bottle",
-  "Tea - box","Iced Coffee - can","Coke","Sprite","Coke Zero","L&P"
+  "Cup - Lg","Cup - Rg","Milk - Cow 2L","Milk - Oat 1L",
+  "Beans - 1kg","Chocolate Powder - Bag","Chocolate Sauce - 500ml Bottle",
+  "Tea - Box","Iced Coffee - Can","Coke","Sprite","Coke Zero","L&P"
 ];
 
 // Menu items — single source of truth for POS
 // canAlt  → shows oat milk toggle (+$1)
-// cup     → 'lg' | 'sm' | null  (cup size to deduct)
-// milkMl  → cow milk per drink (ml)
-// beansG  → beans per drink (g)
-// chocMl  → choc sauce per drink (ml)
-// sk      → direct stock key for cans/bottles
-// custom  → user enters price
+// cup     → 'lg' | 'rg' | null  (matches STOCK_ITEMS above)
+// milkMl  → cow milk per drink (ml); oat replaces this when alt is toggled
+// beansG  → espresso beans per drink (g)
+// chocMl  → chocolate sauce per drink (ml)
+// sk      → direct stock item key for cans/bottles (must match STOCK_ITEMS exactly)
+// custom  → user enters price at time of sale
 const MENU = [
-  {id:"wc_sm", label:"White Coffee", size:"Rg", price:6, canAlt:true,  cup:"sm", milkMl:300, beansG:19, chocMl:0,  cat:"hot"},
+  {id:"wc_rg", label:"White Coffee", size:"Rg", price:6, canAlt:true,  cup:"rg", milkMl:300, beansG:19, chocMl:0,  cat:"hot"},
   {id:"wc_lg", label:"White Coffee", size:"Lg", price:7, canAlt:true,  cup:"lg", milkMl:300, beansG:19, chocMl:0,  cat:"hot"},
-  {id:"bc_sm", label:"Black Coffee", size:"Rg", price:5, canAlt:false, cup:"sm", milkMl:0,   beansG:19, chocMl:0,  cat:"hot"},
+  {id:"bc_rg", label:"Black Coffee", size:"Rg", price:5, canAlt:false, cup:"rg", milkMl:0,   beansG:19, chocMl:0,  cat:"hot"},
   {id:"bc_lg", label:"Black Coffee", size:"Lg", price:5, canAlt:false, cup:"lg", milkMl:0,   beansG:19, chocMl:0,  cat:"hot"},
-  {id:"hc_sm", label:"Hot Choc",     size:"Rg", price:6, canAlt:true,  cup:"sm", milkMl:300, beansG:0,  chocMl:50, cat:"hot"},
+  {id:"hc_rg", label:"Hot Choc",     size:"Rg", price:6, canAlt:true,  cup:"rg", milkMl:300, beansG:0,  chocMl:50, cat:"hot"},
   {id:"hc_lg", label:"Hot Choc",     size:"Lg", price:7, canAlt:true,  cup:"lg", milkMl:300, beansG:0,  chocMl:50, cat:"hot"},
-  {id:"tea_sm",label:"Tea",          size:"Rg", price:5, canAlt:false, cup:"sm", milkMl:0,   beansG:0,  chocMl:0,  cat:"hot"},
+  {id:"tea_rg",label:"Tea",          size:"Rg", price:5, canAlt:false, cup:"rg", milkMl:0,   beansG:0,  chocMl:0,  cat:"hot"},
   {id:"tea_lg",label:"Tea",          size:"Lg", price:5, canAlt:false, cup:"lg", milkMl:0,   beansG:0,  chocMl:0,  cat:"hot"},
-  {id:"ic",    label:"Iced Coffee",  size:"",   price:5, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Iced Coffee - can"},
+  {id:"ic",    label:"Iced Coffee",  size:"",   price:5, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Iced Coffee - Can"},
   {id:"coke",  label:"Coke",         size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Coke"},
   {id:"sprite",label:"Sprite",       size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Sprite"},
   {id:"czero", label:"Coke Zero",    size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Coke Zero"},
   {id:"lp",    label:"L&P",          size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"L&P"},
-  {id:"other", label:"Coffee - Other",size:"",  price:0, canAlt:false, cup:"sm", milkMl:0,   beansG:19, chocMl:0,  cat:"other", custom:true},
+  {id:"other", label:"Coffee - Other",size:"",  price:0, canAlt:false, cup:"rg", milkMl:0,   beansG:19, chocMl:0,  cat:"other", custom:true},
   {id:"donate",label:"Donation",     size:"",   price:0, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"other", custom:true},
 ];
 const CAT_ORDER = ["hot","cold","other"];
 const CAT_LABEL = {hot:"Hot", cold:"Cold", other:"Other"};
 
-// Map POS menu id → sales report product name
+// Maps POS menu id → sales report product name (Title Case throughout)
 const M2R = {
-  wc_sm:"White Coffee - Rg",  wc_lg:"White Coffee - Lg",
-  bc_sm:"Black Coffee - Rg",  bc_lg:"Black Coffee - Lg",
-  hc_sm:"Hot Choc - Rg",      hc_lg:"Hot Choc - Lg",
-  tea_sm:"Tea - Rg",          tea_lg:"Tea - Lg",
+  wc_rg:"White Coffee - Rg",  wc_lg:"White Coffee - Lg",
+  bc_rg:"Black Coffee - Rg",  bc_lg:"Black Coffee - Lg",
+  hc_rg:"Hot Choc - Rg",      hc_lg:"Hot Choc - Lg",
+  tea_rg:"Tea - Rg",          tea_lg:"Tea - Lg",
   ic:"Iced Coffee - Can",     coke:"Coke",    czero:"Coke Zero",
   sprite:"Sprite",            lp:"L&P",
   other:"Coffee - Other",     donate:"Donation",
@@ -164,7 +165,7 @@ function salesFromOrders(orders){
 // ── Derive stock used from sales quantity map ─────────
 // All continuous values at 1dp; counts as whole numbers.
 function stockFromSales(sq){
-  let cowMl=0, oatMl=0, beansG=0, chocMl=0, cupsLg=0, cupsSm=0;
+  let cowMl=0, oatMl=0, beansG=0, chocMl=0, cupsLg=0, cupsRg=0;
   const cans={};
 
   // Proportional oat milk allocation across milk drinks
@@ -176,14 +177,13 @@ function stockFromSales(sq){
     if(prod==="Alt Milk") return;
     const qty=parseInt(rawQty)||0;
     if(qty<=0) return;
-    // Each product name may map to one menu item
     const mid = Object.entries(M2R).find(([,n])=>n===prod)?.[0];
     const def = mid ? MENU.find(m=>m.id===mid) : null;
     if(!def) return;
     beansG += def.beansG * qty;
     chocMl += def.chocMl * qty;
     if(def.cup==="lg") cupsLg+=qty;
-    if(def.cup==="sm") cupsSm+=qty;
+    if(def.cup==="rg") cupsRg+=qty;
     if(def.milkMl>0 && totalMilkDrinks>0){
       const oatShare = Math.round((qty/totalMilkDrinks)*altQty);
       oatMl += def.milkMl * oatShare;
@@ -194,11 +194,11 @@ function stockFromSales(sq){
 
   const u={};
   if(cupsLg>0) u["Cup - Lg"]=cupsLg;
-  if(cupsSm>0) u["Cup - Sm"]=cupsSm;
+  if(cupsRg>0) u["Cup - Rg"]=cupsRg;
   if(cowMl>0)  u["Milk - Cow 2L"]=r1(cowMl/1000);
   if(oatMl>0)  u["Milk - Oat 1L"]=r1(oatMl/1000);
   if(beansG>0) u["Beans - 1kg"]=r1(beansG/1000);
-  if(chocMl>0) u["Chocolate sauce - 500ml bottle"]=r1(chocMl/500);
+  if(chocMl>0) u["Chocolate Sauce - 500ml Bottle"]=r1(chocMl/500);
   Object.entries(cans).forEach(([k,v])=>{ if(v>0) u[k]=v; });
   return u;
 }
@@ -365,6 +365,16 @@ function RmBtn({onClick}){
   );
 }
 
+// Reusable toast hook — returns [showFn, toastElement]
+function useToast(duration=4000){
+  const[toast,setToast]=useState(null);
+  const show=(msg,color="bg-kaiGreen")=>{
+    setToast({msg,color});
+    setTimeout(()=>setToast(null),duration);
+  };
+  return[show, toast?<Toast msg={toast.msg} color={toast.color}/>:null];
+}
+
 // ═══════════════════════════════════════════════════════
 // SETUP SCREEN
 // ═══════════════════════════════════════════════════════
@@ -445,9 +455,7 @@ function POS({event,onUpdate,onBack}){
   const[cat,setCat]         = useState("hot");
   const[showSaved,setShowSaved] = useState(false);
   const[payModal,setPayModal]   = useState(false);
-  const[toast,setToast]     = useState(null);
-
-  const toast2=(m,c="bg-kaiGreen")=>{ setToast({m,c}); setTimeout(()=>setToast(null),2000); };
+  const[showToast,toastEl]      = useToast(2000);
 
   const orders = event.orders||[];
   const open   = orders.filter(o=>o.status==="saved");
@@ -494,20 +502,20 @@ function POS({event,onUpdate,onBack}){
   );
 
   const saveOrd = () => {
-    if(!items.length){ toast2("Add items first","bg-kaiBurgundy"); return; }
+    if(!items.length){ showToast("Add items first","bg-kaiBurgundy"); return; }
     const o={id:oid||uid(), name:oname, items, total, status:"saved", savedAt:new Date().toISOString()};
     const idx=orders.findIndex(x=>x.id===oid);
     upOrd(idx>=0 ? orders.map(x=>x.id===oid?o:x) : [...orders,o]);
-    setOid(o.id); toast2("Order saved");
+    setOid(o.id); showToast("Order saved");
   };
 
   const markPaid = method => {
-    if(!items.length){ toast2("Add items first","bg-kaiBurgundy"); return; }
+    if(!items.length){ showToast("Add items first","bg-kaiBurgundy"); return; }
     const o={id:oid||uid(), name:oname, items, total, status:"paid", payMethod:method, paidAt:new Date().toISOString()};
     const idx=orders.findIndex(x=>x.id===oid);
     upOrd(idx>=0 ? orders.map(x=>x.id===oid?o:x) : [...orders,o]);
     setOid(null); setOname(""); setItems([]); setPayModal(false);
-    toast2(`✓ ${fmt(o.total)} — ${method}`);
+    showToast(`✓ ${fmt(o.total)} — ${method}`);
   };
 
   const catItems   = MENU.filter(m=>m.cat===cat);
@@ -515,7 +523,7 @@ function POS({event,onUpdate,onBack}){
 
   return(
     <div className="pos-wrap bg-gray-50">
-      {toast&&<Toast msg={toast.m} color={toast.c}/>}
+      {toastEl}
 
       {/* Top bar */}
       <div className="bg-coffeeBrown text-white px-3 py-2.5 flex items-center gap-2 shrink-0 shadow">
@@ -650,7 +658,7 @@ function POS({event,onUpdate,onBack}){
               <span className="text-xl font-serif font-bold text-kaiBurgundy">{fmt(total)}</span>
             </div>
             <Btn onClick={saveOrd} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 rounded-xl text-xs font-semibold">Save</Btn>
-            <Btn onClick={()=>items.length?setPayModal(true):toast2("Add items first","bg-kaiBurgundy")}
+            <Btn onClick={()=>items.length?setPayModal(true):showToast("Add items first","bg-kaiBurgundy")}
               className="w-full bg-kaiGreen hover:bg-green-700 text-white py-2 rounded-xl text-sm font-bold">
               Pay →
             </Btn>
@@ -734,15 +742,13 @@ function EventScreen({webAppUrl,onBack}){
   const[posOpen,setPosOpen] = useState(false);
   const[showSum,setShowSum] = useState(false);
   const[loading,setLoading] = useState(false);
-  const[toast,setToast]     = useState(null);
-  const[copied,setCopied]   = useState(false);
   const[editSales,setEditSales] = useState(false);
   const[editStock,setEditStock] = useState(false);
   const[editMoney,setEditMoney] = useState(false);
+  const[showToast,toastEl]  = useToast(5000);
 
   useEffect(()=>{ lsSet(EV_KEY,ev); },[ev]);
-  const upd   = (k,v) => setEv(p=>({...p,[k]:v}));
-  const toast2 = (m,c="bg-kaiGreen") => { setToast({m,c}); setTimeout(()=>setToast(null),5000); };
+  const upd = (k,v) => setEv(p=>({...p,[k]:v}));
 
   // Resolved display values
   const sales  = effSales(ev);
@@ -786,13 +792,13 @@ function EventScreen({webAppUrl,onBack}){
   // ── Submit report ─────────────────────────────────────
   const doSubmit = async () => {
     if(!ev.date||!ev.completedBy||!ev.eventName){
-      toast2("Date, Event Name and Completed By required","bg-kaiBurgundy"); return;
+      showToast("Date, Event Name and Completed By required","bg-kaiBurgundy"); return;
     }
     if(!webAppUrl){
-      toast2("No Web App URL set — open Settings to configure","bg-kaiBurgundy"); return;
+      showToast("No Web App URL set — open Settings to configure","bg-kaiBurgundy"); return;
     }
     if(!navigator.onLine){
-      toast2("No internet connection. Data is saved — resubmit when back online.","bg-amber-600"); return;
+      showToast("No internet connection. Data is saved — resubmit when back online.","bg-amber-600"); return;
     }
     setLoading(true);
     try{
@@ -826,14 +832,15 @@ function EventScreen({webAppUrl,onBack}){
       const res = await fetch(webAppUrl,{method:"POST",body:fd});
       const j   = await res.json();
       if(!j.success) throw new Error(j.error||"Unknown error");
-      // Success: clear local state and go home
       lsDel(EV_KEY);
-      onBack();
+      // Brief success toast then navigate home
+      showToast("✓ Report submitted successfully");
+      setTimeout(()=>onBack(), 1200);
     }catch(err){
       if(!navigator.onLine)
-        toast2("Submission failed — no connection. Data saved. Resubmit when online.","bg-amber-600");
+        showToast("Submission failed — no connection. Data saved. Resubmit when online.","bg-amber-600");
       else
-        toast2(`Submission failed: ${err.message}. Data is still saved — try again.`,"bg-kaiBurgundy");
+        showToast(`Submission failed: ${err.message}. Data is still saved — try again.`,"bg-kaiBurgundy");
     }finally{ setLoading(false); }
   };
 
@@ -848,8 +855,7 @@ function EventScreen({webAppUrl,onBack}){
 
   return(
     <div className="min-h-screen flex flex-col">
-      {toast&&<Toast msg={toast.m} color={toast.c}/>}
-      {copied&&<Toast msg="✓ Copied" color="bg-kaiBlue"/>}
+      {toastEl}
       <Header sub={ev.eventName||"Sales Report"} onBack={onBack}/>
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 pb-12 space-y-4">
@@ -1100,7 +1106,7 @@ function EventScreen({webAppUrl,onBack}){
             <pre className="whitespace-pre-wrap font-sans text-gray-800 text-xs bg-white p-4 rounded-2xl leading-relaxed">
               {buildSummary(ev)}
             </pre>
-            <Btn onClick={()=>{ navigator.clipboard.writeText(buildSummary(ev)); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
+            <Btn onClick={()=>{ navigator.clipboard.writeText(buildSummary(ev)); showToast("✓ Copied to clipboard","bg-kaiBlue"); }}
               className="mt-3 w-full bg-kaiBlue hover:bg-blue-900 text-white py-2.5 rounded-xl font-semibold text-sm">
               Copy to Clipboard
             </Btn>
@@ -1126,26 +1132,24 @@ function StockScreen({webAppUrl,onBack}){
   const[loading,setLoading] = useState(false);
   const[saving,setSaving]   = useState(false);
   const[edits,setEdits]     = useState({});
-  const[toast,setToast]     = useState(null);
+  const[showToast,toastEl]  = useToast();
   const[rDate,setRDate]     = useState(toDay());
   const[supplier,setSupplier] = useState("");
   const[rItems,setRItems]   = useState(STOCK_ITEMS.map(i=>({item:i,qty:"",cpu:""})));
 
-  const toast2=(m,c="bg-kaiGreen")=>{ setToast({m,c}); setTimeout(()=>setToast(null),2500); };
-
-  const fetchStock = useCallback(async()=>{
+  async function fetchStock(){
     if(!webAppUrl) return;
     setLoading(true);
     try{
       const r = await fetch(`${webAppUrl}?action=getStock`);
       const d = await r.json();
       if(d.success){ setLevels(d.stock); setLog(d.reorderLog||[]); }
-      else toast2("Error: "+d.error,"bg-kaiBurgundy");
-    }catch{ toast2("Connection failed","bg-kaiBurgundy"); }
+      else showToast("Error: "+d.error,"bg-kaiBurgundy");
+    }catch{ showToast("Connection failed","bg-kaiBurgundy"); }
     finally{ setLoading(false); }
-  },[webAppUrl]);
+  }
 
-  useEffect(()=>{ fetchStock(); },[fetchStock]);
+  useEffect(()=>{ fetchStock(); },[webAppUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveEdits = async () => {
     if(!Object.keys(edits).length) return;
@@ -1155,16 +1159,16 @@ function StockScreen({webAppUrl,onBack}){
       Object.entries(edits).forEach(([i,q])=>{ fd.append("item[]",i); fd.append("qty[]",q); });
       const r = await fetch(webAppUrl,{method:"POST",body:fd});
       const d = await r.json();
-      if(d.success){ toast2("✓ Stock updated"); setEdits({}); fetchStock(); }
-      else toast2("Error: "+d.error,"bg-kaiBurgundy");
-    }catch{ toast2("Failed","bg-kaiBurgundy"); }
+      if(d.success){ showToast("✓ Stock updated"); setEdits({}); fetchStock(); }
+      else showToast("Error: "+d.error,"bg-kaiBurgundy");
+    }catch{ showToast("Failed","bg-kaiBurgundy"); }
     finally{ setSaving(false); }
   };
 
   const submitReorder = async () => {
     const items = rItems.filter(r=>hasV(r.qty));
-    if(!items.length){ toast2("Enter at least one quantity","bg-kaiBurgundy"); return; }
-    if(!supplier.trim()){ toast2("Enter a supplier / source","bg-kaiBurgundy"); return; }
+    if(!items.length){ showToast("Enter at least one quantity","bg-kaiBurgundy"); return; }
+    if(!supplier.trim()){ showToast("Enter a supplier / source","bg-kaiBurgundy"); return; }
     setSaving(true);
     try{
       const fd=new FormData();
@@ -1179,12 +1183,12 @@ function StockScreen({webAppUrl,onBack}){
       const r = await fetch(webAppUrl,{method:"POST",body:fd});
       const d = await r.json();
       if(d.success){
-        toast2("✓ Reorder logged");
+        showToast("✓ Reorder logged");
         setSupplier(""); setTab("levels");
         setRItems(STOCK_ITEMS.map(i=>({item:i,qty:"",cpu:""})));
         fetchStock();
-      } else toast2("Error: "+d.error,"bg-kaiBurgundy");
-    }catch{ toast2("Failed","bg-kaiBurgundy"); }
+      } else showToast("Error: "+d.error,"bg-kaiBurgundy");
+    }catch{ showToast("Failed","bg-kaiBurgundy"); }
     finally{ setSaving(false); }
   };
 
@@ -1192,7 +1196,7 @@ function StockScreen({webAppUrl,onBack}){
 
   return(
     <div className="min-h-screen flex flex-col">
-      {toast&&<Toast msg={toast.m} color={toast.c}/>}
+      {toastEl}
       <Header sub="Stock Management" onBack={onBack}/>
       <div className="flex-1 w-full max-w-lg mx-auto px-4 pb-8">
         <div className="flex rounded-2xl overflow-hidden border border-gray-100 shadow-sm mb-4">
