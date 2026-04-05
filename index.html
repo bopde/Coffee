@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>LegaSea Coffee Cart</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -29,18 +32,25 @@
       }
     }
   </script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body { overscroll-behavior: none; }
+    .pos-grid { display: grid; grid-template-columns: 1fr 200px; }
+    @media (max-width: 480px) { .pos-grid { grid-template-columns: 1fr 160px; } }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  </style>
 </head>
 <body class="bg-kaiYellow font-sans">
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useCallback, useRef, useMemo } = React;
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
-// ─────────────────────────────────────────────
-// CONFIG
-// ─────────────────────────────────────────────
-const LOGO_URL = "https://raw.githubusercontent.com/bopde/Kai-Ika-report/main/KAI-IKA_log_white-on-trans01.png";
-const WEB_APP_KEY  = "coffeeCartWebAppUrl";
-const EVENT_KEY    = "coffeeCartEvent";
+// ═══════════════════════════════════════════════════════
+// CONSTANTS & CONFIG
+// ═══════════════════════════════════════════════════════
+const LOGO_URL    = "https://raw.githubusercontent.com/bopde/Kai-Ika-report/main/KAI-IKA_log_white-on-trans01.png";
+const WEB_APP_KEY = "coffeeCartWebAppUrl";
+const EVENT_KEY   = "coffeeCartEvent_v3";
 
 const STAFF = ["Ben","Connor","Dave","Opu","Matt","Jay","Xavier","Volunteer","Other"];
 
@@ -50,33 +60,34 @@ const STOCK_ITEMS = [
   "Tea - box","Iced Coffee - can","Coke","Sprite","Coke Zero","L&P"
 ];
 
-// POS menu items — each is a single, tappable product
-// altMilk: true  → has alt milk modifier (+$1)
-// cup: 'lg'|'sm' → auto-assign cup
-// milk: ml       → cow milk used (if not alt milk order)
-// beans: g       → coffee beans used
-// stockKey        → which stock item to decrement (drinks)
+// ── POS Menu ──────────────────────────────────────────
+// altMilk  → can have oat milk modifier (+$1)
+// cup      → 'lg' | 'sm' | null
+// milk     → ml cow milk per drink
+// chocSauce→ ml choc sauce per drink
+// beans    → g beans per drink
+// stockKey → direct stock item (cans/bottles)
+// cat      → 'hot' | 'cold' | 'other'
 const MENU = [
-  { id:"wc_sm",  label:"White Coffee",        size:"Rg", price:6,  altMilk:true, cup:"sm", milk:300, beans:19, cat:"coffee" },
-  { id:"wc_lg",  label:"White Coffee",        size:"Lg", price:7,  altMilk:true, cup:"lg", milk:300, beans:19, cat:"coffee" },
-  { id:"bc_sm",  label:"Black Coffee",        size:"Rg", price:5,  altMilk:false,cup:"sm", milk:0,   beans:19, cat:"coffee" },
-  { id:"bc_lg",  label:"Black Coffee",        size:"Lg", price:5,  altMilk:false,cup:"lg", milk:0,   beans:19, cat:"coffee" },
-  { id:"hc_sm",  label:"Hot Choc",            size:"Rg", price:6,  altMilk:true, cup:"sm", milk:300, beans:0,  cat:"hot" },
-  { id:"hc_lg",  label:"Hot Choc",            size:"Lg", price:7,  altMilk:true, cup:"lg", milk:300, beans:0,  cat:"hot" },
-  { id:"tea_sm", label:"Tea",                 size:"Rg", price:5,  altMilk:false,cup:"sm", milk:0,   beans:0,  cat:"hot" },
-  { id:"tea_lg", label:"Tea",                 size:"Lg", price:5,  altMilk:false,cup:"lg", milk:0,   beans:0,  cat:"hot" },
-  { id:"ic",     label:"Iced Coffee",         size:"",   price:5,  altMilk:false,cup:null, milk:0,   beans:0,  cat:"cold", stockKey:"Iced Coffee - can" },
-  { id:"coke",   label:"Coke",                size:"",   price:3,  altMilk:false,cup:null, milk:0,   beans:0,  cat:"cold", stockKey:"Coke" },
-  { id:"sprite", label:"Sprite",              size:"",   price:3,  altMilk:false,cup:null, milk:0,   beans:0,  cat:"cold", stockKey:"Sprite" },
-  { id:"lp",     label:"L&P",                 size:"",   price:3,  altMilk:false,cup:null, milk:0,   beans:0,  cat:"cold", stockKey:"L&P" },
-  { id:"other",  label:"Coffee - Other",      size:"",   price:0,  altMilk:false,cup:"sm", milk:0,   beans:19, cat:"other", customPrice:true },
-  { id:"donate", label:"Donation",            size:"",   price:0,  altMilk:false,cup:null, milk:0,   beans:0,  cat:"other", customPrice:true },
+  { id:"wc_sm",   label:"White Coffee",   size:"Rg", price:6, altMilk:true,  cup:"sm", milk:300, chocSauce:0,  beans:19, cat:"hot" },
+  { id:"wc_lg",   label:"White Coffee",   size:"Lg", price:7, altMilk:true,  cup:"lg", milk:300, chocSauce:0,  beans:19, cat:"hot" },
+  { id:"bc_sm",   label:"Black Coffee",   size:"Rg", price:5, altMilk:false, cup:"sm", milk:0,   chocSauce:0,  beans:19, cat:"hot" },
+  { id:"bc_lg",   label:"Black Coffee",   size:"Lg", price:5, altMilk:false, cup:"lg", milk:0,   chocSauce:0,  beans:19, cat:"hot" },
+  { id:"hc_sm",   label:"Hot Choc",       size:"Rg", price:6, altMilk:true,  cup:"sm", milk:300, chocSauce:50, beans:0,  cat:"hot" },
+  { id:"hc_lg",   label:"Hot Choc",       size:"Lg", price:7, altMilk:true,  cup:"lg", milk:300, chocSauce:50, beans:0,  cat:"hot" },
+  { id:"tea_sm",  label:"Tea",            size:"Rg", price:5, altMilk:false, cup:"sm", milk:0,   chocSauce:0,  beans:0,  cat:"hot" },
+  { id:"tea_lg",  label:"Tea",            size:"Lg", price:5, altMilk:false, cup:"lg", milk:0,   chocSauce:0,  beans:0,  cat:"hot" },
+  { id:"ic",      label:"Iced Coffee",    size:"",   price:5, altMilk:false, cup:null, milk:0,   chocSauce:0,  beans:0,  cat:"cold", stockKey:"Iced Coffee - can" },
+  { id:"coke",    label:"Coke",           size:"",   price:3, altMilk:false, cup:null, milk:0,   chocSauce:0,  beans:0,  cat:"cold", stockKey:"Coke" },
+  { id:"sprite",  label:"Sprite",         size:"",   price:3, altMilk:false, cup:null, milk:0,   chocSauce:0,  beans:0,  cat:"cold", stockKey:"Sprite" },
+  { id:"lp",      label:"L&P",            size:"",   price:3, altMilk:false, cup:null, milk:0,   chocSauce:0,  beans:0,  cat:"cold", stockKey:"L&P" },
+  { id:"other",   label:"Coffee - Other", size:"",   price:0, altMilk:false, cup:"sm", milk:0,   chocSauce:0,  beans:19, cat:"other", customPrice:true },
+  { id:"donate",  label:"Donation",       size:"",   price:0, altMilk:false, cup:null, milk:0,   chocSauce:0,  beans:0,  cat:"other", customPrice:true },
 ];
 
-const CAT_LABELS = { coffee:"Coffee", hot:"Hot Drinks", cold:"Cold Drinks", other:"Other" };
-const CAT_ORDER  = ["coffee","hot","cold","other"];
+const CAT_ORDER  = ["hot","cold","other"];
+const CAT_LABELS = { hot:"Hot", cold:"Cold", other:"Other" };
 
-// Map menu ids back to the Sales Report product names
 const MENU_TO_REPORT = {
   wc_sm:"White Coffee - Rg", wc_lg:"White Coffee - Lg",
   bc_sm:"Black Coffee - Rg", bc_lg:"Black Coffee - Lg",
@@ -96,167 +107,262 @@ const ALL_REPORT_PRODUCTS = [
   "Coffee - Other","Donation"
 ];
 
-// ─────────────────────────────────────────────
+// Stock calc rules from sales quantities (for manual sales edit → stock recalc)
+// Each product: { milk_ml, oat_ml, beans_g, chocSauce_ml, cup, stockKey }
+const PRODUCT_STOCK_RULES = {
+  "White Coffee - Rg": { milk:300, oat:0,   beans:19, choc:0,  cup:"sm" },
+  "White Coffee - Lg": { milk:300, oat:0,   beans:19, choc:0,  cup:"lg" },
+  "Black Coffee - Rg": { milk:0,   oat:0,   beans:19, choc:0,  cup:"sm" },
+  "Black Coffee - Lg": { milk:0,   oat:0,   beans:19, choc:0,  cup:"lg" },
+  "Hot Choc - Rg":     { milk:300, oat:0,   beans:0,  choc:50, cup:"sm" },
+  "Hot Choc - Lg":     { milk:300, oat:0,   beans:0,  choc:50, cup:"lg" },
+  "Tea - Rg":          { milk:0,   oat:0,   beans:0,  choc:0,  cup:"sm" },
+  "Tea - Lg":          { milk:0,   oat:0,   beans:0,  choc:0,  cup:"lg" },
+  "Alt Milk":          { milk:-300,oat:300, beans:0,  choc:0,  cup:null },
+  "Iced Coffee - Can": { milk:0,   oat:0,   beans:0,  choc:0,  cup:null, stockKey:"Iced Coffee - can" },
+  "Coke":              { milk:0,   oat:0,   beans:0,  choc:0,  cup:null, stockKey:"Coke" },
+  "Sprite":            { milk:0,   oat:0,   beans:0,  choc:0,  cup:null, stockKey:"Sprite" },
+  "L&P":               { milk:0,   oat:0,   beans:0,  choc:0,  cup:null, stockKey:"L&P" },
+  "Coffee - Other":    { milk:0,   oat:0,   beans:19, choc:0,  cup:"sm" },
+  "Donation":          { milk:0,   oat:0,   beans:0,  choc:0,  cup:null },
+};
+
+// ═══════════════════════════════════════════════════════
 // HELPERS
-// ─────────────────────────────────────────────
-const fmt  = n => `$${parseFloat(n||0).toFixed(2)}`;
+// ═══════════════════════════════════════════════════════
+const fmt      = n => `$${parseFloat(n||0).toFixed(2)}`;
 const todayStr = () => new Date().toISOString().slice(0,10);
 const nowTime  = () => new Date().toTimeString().slice(0,5);
-const uid  = () => Math.random().toString(36).slice(2,8);
-const hasData = v => v !== null && v !== undefined && v !== "" && v !== "0" && v !== 0;
+const uid      = () => Math.random().toString(36).slice(2,9);
+const hasData  = v => v !== null && v !== undefined && v !== "" && v !== "0" && v !== 0;
 
-function loadEvent()  { try { return JSON.parse(localStorage.getItem(EVENT_KEY)); } catch{ return null; } }
-function saveEvent(e) { localStorage.setItem(EVENT_KEY, JSON.stringify(e)); }
-function clearEvent() { localStorage.removeItem(EVENT_KEY); }
+// localStorage helpers
+function loadLS(key, fallback=null) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+}
+function saveLS(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch{} }
+function clearLS(key)     { try { localStorage.removeItem(key); } catch{} }
 
-// Build a blank event object
+const loadEvent  = () => loadLS(EVENT_KEY);
+const saveEvent  = ev  => saveLS(EVENT_KEY, ev);
+const clearEvent = ()  => clearLS(EVENT_KEY);
+
 function blankEvent() {
   return {
-    id: uid(),
-    date: todayStr(),
-    eventName: "",
-    location: "",
-    completedBy: "",
-    staffRows: [],
-    orders: [],           // POS orders
-    // overrides (user can edit)
-    salesOverride: null,  // null = auto from POS
-    stockOverride: null,  // null = auto from POS
-    cashSales: "",
-    eftposSales: "",
-    fridgeReadings: [],
-    crowdNotes: "",
-    equipmentIssues: "",
-    legaseaSignups: "",
-    notes: "",
+    id: uid(), date: todayStr(),
+    eventName:"", location:"", completedBy:"",
+    staffRows:[], orders:[],
+    // Priority flags
+    salesLocked: false,  // true = user manually edited sales
+    stockLocked: false,  // true = user manually edited stock
+    // Data stores
+    salesOverride: null,   // {product: qty} — null = use POS
+    stockOverride: null,   // {item: val}    — null = derive
+    manualCash: "",        // "" = use POS totals
+    manualEftpos: "",
+    fridgeReadings:[],
+    equipmentIssues:"",
+    notes:"",
   };
 }
 
-// Derive totals from orders
+// ── Derive sales from POS orders ─────────────────────
 function deriveSalesFromOrders(orders) {
   const paid = orders.filter(o => o.status === "paid");
   const qtyMap = {};
   let altMilkCount = 0;
-
   paid.forEach(order => {
     order.items.forEach(item => {
-      const reportName = MENU_TO_REPORT[item.menuId];
-      if (reportName) qtyMap[reportName] = (qtyMap[reportName]||0) + item.qty;
+      const rn = MENU_TO_REPORT[item.menuId];
+      if (rn) qtyMap[rn] = (qtyMap[rn]||0) + item.qty;
       if (item.altMilk) altMilkCount += item.qty;
     });
   });
-
   if (altMilkCount > 0) qtyMap["Alt Milk"] = altMilkCount;
   return qtyMap;
 }
 
-// Derive stock used from orders (auto)
+// ── Derive stock from POS orders ─────────────────────
 function deriveStockFromOrders(orders) {
   const paid = orders.filter(o => o.status === "paid");
-  let cowMilkMl = 0, oatMilkMl = 0, beansG = 0;
-  let cupsLg = 0, cupsSm = 0;
-  const itemStock = {}; // for cans / bottles with explicit stockKey
-
+  let cowMilkMl=0, oatMilkMl=0, beansG=0, chocSauceMl=0, cupsLg=0, cupsSm=0;
+  const itemStock = {};
   paid.forEach(order => {
     order.items.forEach(item => {
       const def = MENU.find(m => m.id === item.menuId);
       if (!def) return;
-
-      const qty = item.qty;
-      if (def.beans > 0) beansG += def.beans * qty;
-      if (item.altMilk) {
-        oatMilkMl += def.milk * qty;
-      } else {
-        cowMilkMl += def.milk * qty;
-      }
-      if (def.cup === "lg") cupsLg += qty;
-      if (def.cup === "sm") cupsSm += qty;
-      if (def.stockKey) itemStock[def.stockKey] = (itemStock[def.stockKey]||0) + qty;
+      const q = item.qty;
+      if (def.beans > 0) beansG += def.beans * q;
+      if (def.chocSauce > 0) chocSauceMl += def.chocSauce * q;
+      if (item.altMilk) { oatMilkMl += def.milk * q; }
+      else               { cowMilkMl += def.milk * q; }
+      if (def.cup === "lg") cupsLg += q;
+      if (def.cup === "sm") cupsSm += q;
+      if (def.stockKey) itemStock[def.stockKey] = (itemStock[def.stockKey]||0) + q;
     });
   });
+  return buildStockResult(cowMilkMl, oatMilkMl, beansG, chocSauceMl, cupsLg, cupsSm, itemStock);
+}
 
-  // Convert to stock units
+// ── Derive stock from sales quantities (manual sales edit) ──
+function deriveStockFromSales(salesQty) {
+  let cowMilkMl=0, oatMilkMl=0, beansG=0, chocSauceMl=0, cupsLg=0, cupsSm=0;
+  const itemStock = {};
+  Object.entries(salesQty).forEach(([product, qty]) => {
+    const q   = parseFloat(qty)||0;
+    const rule = PRODUCT_STOCK_RULES[product];
+    if (!rule || q === 0) return;
+    // Alt Milk subtracts cow milk and adds oat milk
+    if (product === "Alt Milk") {
+      cowMilkMl += rule.milk * q;   // negative value
+      oatMilkMl += rule.oat  * q;
+      return;
+    }
+    cowMilkMl   += (rule.milk  || 0) * q;
+    oatMilkMl   += (rule.oat   || 0) * q;
+    beansG      += (rule.beans || 0) * q;
+    chocSauceMl += (rule.choc  || 0) * q;
+    if (rule.cup === "lg") cupsLg += q;
+    if (rule.cup === "sm") cupsSm += q;
+    if (rule.stockKey) itemStock[rule.stockKey] = (itemStock[rule.stockKey]||0) + q;
+  });
+  return buildStockResult(Math.max(0,cowMilkMl), oatMilkMl, beansG, chocSauceMl, cupsLg, cupsSm, itemStock);
+}
+
+function buildStockResult(cowMilkMl, oatMilkMl, beansG, chocSauceMl, cupsLg, cupsSm, itemStock) {
   const used = {};
-  if (cupsLg > 0) used["Cup - Lg"] = cupsLg;
-  if (cupsSm > 0) used["Cup - Sm"] = cupsSm;
-  // Cow milk: 2L jugs → round up
-  if (cowMilkMl > 0) used["Milk - Cow 2L"] = parseFloat((cowMilkMl/2000).toFixed(2));
-  if (oatMilkMl > 0) used["Milk - Oat 1L"] = parseFloat((oatMilkMl/1000).toFixed(2));
-  // Beans: 1kg bags → round up
-  if (beansG > 0) used["Beans - 1kg"] = parseFloat((beansG/1000).toFixed(3));
-  // Cans/bottles
+  if (cupsLg > 0)      used["Cup - Lg"]                      = cupsLg;
+  if (cupsSm > 0)      used["Cup - Sm"]                      = cupsSm;
+  if (cowMilkMl > 0)   used["Milk - Cow 2L"]                 = parseFloat((cowMilkMl/2000).toFixed(3));
+  if (oatMilkMl > 0)   used["Milk - Oat 1L"]                 = parseFloat((oatMilkMl/1000).toFixed(3));
+  if (beansG > 0)      used["Beans - 1kg"]                   = parseFloat((beansG/1000).toFixed(3));
+  if (chocSauceMl > 0) used["Chocolate sauce - 500ml bottle"] = parseFloat((chocSauceMl/500).toFixed(3));
   Object.entries(itemStock).forEach(([k,v]) => { used[k] = v; });
-
   return used;
 }
 
-// Cash / eftpos from paid orders
+// ── Cash / eftpos from paid POS orders ───────────────
 function deriveCashEftpos(orders) {
-  let cash = 0, eftpos = 0;
-  orders.filter(o => o.status==="paid").forEach(o => {
-    if (o.payMethod === "cash")   cash   += o.total;
-    if (o.payMethod === "eftpos") eftpos += o.total;
+  let cash=0, eftpos=0;
+  orders.filter(o=>o.status==="paid").forEach(o=>{
+    if (o.payMethod==="cash")   cash   += o.total;
+    if (o.payMethod==="eftpos") eftpos += o.total;
   });
   return { cash: cash.toFixed(2), eftpos: eftpos.toFixed(2) };
 }
 
-function buildSummary(ev) {
-  const salesQty   = ev.salesOverride   || deriveSalesFromOrders(ev.orders);
-  const stockUsed  = ev.stockOverride   || deriveStockFromOrders(ev.orders);
-  const { cash, eftpos } = deriveCashEftpos(ev.orders);
-  const cashVal   = hasData(ev.cashSales)   ? ev.cashSales   : cash;
-  const eftposVal = hasData(ev.eftposSales) ? ev.eftposSales : eftpos;
-  const total     = (parseFloat(cashVal||0) + parseFloat(eftposVal||0)).toFixed(2);
+// ── Resolve effective values for an event ────────────
+function resolveEvent(ev) {
+  const posSales   = deriveSalesFromOrders(ev.orders||[]);
+  const activeSales = (ev.salesLocked && ev.salesOverride) ? ev.salesOverride : posSales;
 
-  let s = `Date: ${ev.date||"-"}
-Event: ${ev.eventName||"-"}
-Location: ${ev.location||"-"}
-Completed By: ${ev.completedBy||"-"}
-`;
-  if (ev.staffRows.length) {
-    s += `\n--- Staff ---\n`;
-    ev.staffRows.forEach(r => { s += `${r.staffName}, Start: ${r.startTime||"-"}, End: ${r.endTime||"-"}\n`; });
+  let activeStock;
+  if (ev.stockLocked && ev.stockOverride) {
+    activeStock = ev.stockOverride;
+  } else if (ev.salesLocked && ev.salesOverride) {
+    activeStock = deriveStockFromSales(ev.salesOverride);
+  } else {
+    activeStock = deriveStockFromOrders(ev.orders||[]);
   }
-  const hasSales = Object.values(salesQty).some(v=>v>0);
+
+  const { cash: posCash, eftpos: posEftpos } = deriveCashEftpos(ev.orders||[]);
+  const cashVal   = hasData(ev.manualCash)   ? ev.manualCash   : posCash;
+  const eftposVal = hasData(ev.manualEftpos) ? ev.manualEftpos : posEftpos;
+  const total     = (parseFloat(cashVal||0)+parseFloat(eftposVal||0)).toFixed(2);
+
+  return { activeSales, activeStock, cashVal, eftposVal, total };
+}
+
+// ── Staff hours calc ──────────────────────────────────
+function calcHours(start, end) {
+  if (!start || !end) return 0;
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  let diff = new Date(0,0,0,eh,em) - new Date(0,0,0,sh,sm);
+  if (diff < 0) diff += 86400000;
+  return Math.round((diff/3600000)*100)/100;
+}
+
+// ── Build summary text ────────────────────────────────
+function buildSummary(ev) {
+  const { activeSales, activeStock, cashVal, eftposVal, total } = resolveEvent(ev);
+  let s = `Date: ${ev.date||"-"}\nEvent: ${ev.eventName||"-"}\nLocation: ${ev.location||"-"}\nCompleted By: ${ev.completedBy||"-"}\n`;
+
+  if (ev.staffRows?.length) {
+    s += `\n--- Staff ---\n`;
+    ev.staffRows.forEach(r => {
+      const h = calcHours(r.startTime, r.endTime);
+      s += `${r.staffName}, Start: ${r.startTime||"-"}, End: ${r.endTime||"-"}${h?` (${h}h)`:""}  \n`;
+    });
+  }
+
+  const hasSales = Object.values(activeSales).some(v=>v>0);
   if (hasSales || hasData(cashVal)) {
     s += `\n--- Sales ---\n`;
-    Object.entries(salesQty).filter(([,v])=>v>0).forEach(([k,v])=>{ s += `${k}: ${v}\n`; });
+    Object.entries(activeSales).filter(([,v])=>v>0).forEach(([k,v])=>{ s+=`${k}: ${v}\n`; });
     s += `Cash Sales: $${cashVal}\nEftpos Sales: $${eftposVal}\nTotal Sales: $${total}\n`;
   }
-  const hasStock = Object.keys(stockUsed).length > 0;
-  if (hasStock) {
+
+  if (Object.keys(activeStock).length) {
     s += `\n--- Stock Used ---\n`;
-    Object.entries(stockUsed).forEach(([k,v])=>{ s += `${k}: ${v}\n`; });
+    Object.entries(activeStock).forEach(([k,v])=>{ s+=`${k}: ${v}\n`; });
   }
-  if (ev.fridgeReadings.length) {
+
+  if (ev.fridgeReadings?.length) {
     s += `\n--- Fridge Temperatures ---\n`;
-    ev.fridgeReadings.forEach(r=>{ s += `${r.time}: ${r.temp}°C\n`; });
+    ev.fridgeReadings.forEach(r=>{ s+=`${r.time}: ${r.temp}°C\n`; });
   }
-  if (hasData(ev.legaseaSignups)) s += `\nLegaSea Signups: ${ev.legaseaSignups}\n`;
-  if (hasData(ev.crowdNotes)||hasData(ev.equipmentIssues)||hasData(ev.notes)) {
+
+  if (hasData(ev.equipmentIssues)||hasData(ev.notes)) {
     s += `\n--- Notes ---\n`;
-    if (hasData(ev.crowdNotes))       s += `Crowd & Busy Periods: ${ev.crowdNotes}\n`;
-    if (hasData(ev.equipmentIssues))  s += `Equipment / Water / Power Issues: ${ev.equipmentIssues}\n`;
-    if (hasData(ev.notes))            s += `General Notes: ${ev.notes}\n`;
+    if (hasData(ev.equipmentIssues)) s+=`Issues: ${ev.equipmentIssues}\n`;
+    if (hasData(ev.notes))           s+=`General Notes: ${ev.notes}\n`;
   }
   return s;
 }
 
-// ─────────────────────────────────────────────
-// SMALL UI ATOMS
-// ─────────────────────────────────────────────
-const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-kaiGreen/40";
+// ── P&L calculation ───────────────────────────────────
+function calcPnL(ev, reorderCosts) {
+  const { total } = resolveEvent(ev);
+  const revenue = parseFloat(total)||0;
+
+  // Staff cost
+  const staffCost = (ev.staffRows||[]).reduce((sum,r)=>{
+    return sum + calcHours(r.startTime, r.endTime) * 30;
+  }, 0);
+
+  // Stock cost: match stock used against most recent reorder cost
+  const { activeStock } = resolveEvent(ev);
+  let stockCost = 0;
+  Object.entries(activeStock).forEach(([item, qty]) => {
+    const costPerUnit = reorderCosts[item] || 0;
+    stockCost += (parseFloat(qty)||0) * costPerUnit;
+  });
+
+  const totalCost = staffCost + stockCost;
+  const profit    = revenue - totalCost;
+  return { revenue, staffCost, stockCost, totalCost, profit };
+}
+
+// ═══════════════════════════════════════════════════════
+// UI ATOMS
+// ═══════════════════════════════════════════════════════
+const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 font-sans text-sm focus:outline-none focus:ring-2 focus:ring-kaiGreen/40 bg-white";
 
 function Toast({msg, color="bg-kaiGreen"}) {
   if (!msg) return null;
-  return <div className={`fixed top-4 left-1/2 -translate-x-1/2 ${color} text-white px-6 py-3 rounded-lg shadow-lg z-[90] font-sans text-sm whitespace-nowrap`}>{msg}</div>;
+  return (
+    <div className={`fixed top-4 left-1/2 -translate-x-1/2 ${color} text-white px-5 py-3 rounded-xl shadow-xl z-[99] font-sans text-sm max-w-xs text-center leading-snug`}>
+      {msg}
+    </div>
+  );
 }
 
 function Card({title, children, action, color="text-kaiGreen", bg="bg-kaiGreen/5"}) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className={`px-4 py-3 border-b border-gray-100 flex items-center justify-between ${bg}`}>
-        <h3 className={`text-base font-serif font-semibold ${color}`}>{title}</h3>
+        <h3 className={`text-sm font-semibold ${color}`}>{title}</h3>
         {action}
       </div>
       <div className="p-4">{children}</div>
@@ -264,11 +370,11 @@ function Card({title, children, action, color="text-kaiGreen", bg="bg-kaiGreen/5
   );
 }
 
-function AddBtn({onClick, label}) {
+function Btn({onClick, children, className=""}) {
   return (
     <button type="button" onClick={onClick}
-      className="bg-kaiBurgundy hover:bg-red-800 text-white px-3 py-1 rounded-lg font-semibold text-xs shadow-sm transition-colors">
-      {label}
+      className={`font-semibold rounded-xl transition-all active:scale-95 ${className}`}>
+      {children}
     </button>
   );
 }
@@ -276,7 +382,7 @@ function AddBtn({onClick, label}) {
 function RemoveBtn({onClick}) {
   return (
     <button type="button" onClick={onClick}
-      className="absolute -top-2 -right-2 bg-white border border-gray-200 text-gray-400 hover:text-red-500 rounded-full w-5 h-5 flex items-center justify-center shadow-sm cursor-pointer text-xs z-10 transition-colors">
+      className="absolute -top-2 -right-2 bg-white border border-gray-200 text-gray-400 hover:text-red-500 rounded-full w-6 h-6 flex items-center justify-center shadow-sm text-xs z-10">
       ✕
     </button>
   );
@@ -291,15 +397,32 @@ function Field({label, children}) {
   );
 }
 
-function Header({subtitle, onBack, onSettings, extraRight}) {
+function OnlineStatus() {
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(()=>{
+    const on  = ()=>setOnline(true);
+    const off = ()=>setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return ()=>{ window.removeEventListener('online',on); window.removeEventListener('offline',off); };
+  },[]);
+  if (online) return null;
   return (
-    <header className="w-full bg-kaiBurgundy text-white flex flex-col items-center py-5 shadow-md mb-5 relative">
-      <img src={LOGO_URL} alt="Kai Ika" className="h-14 mb-2 object-contain" />
-      <h1 className="text-2xl md:text-3xl font-serif font-bold text-center">Coffee Cart</h1>
-      {subtitle && <p className="text-coffeeLight mt-0.5 text-xs tracking-wide opacity-80">{subtitle}</p>}
+    <div className="fixed bottom-0 inset-x-0 bg-amber-500 text-white text-center text-xs py-2 z-50 safe-bottom">
+      ⚠ You are offline — data is saved locally
+    </div>
+  );
+}
+
+function Header({subtitle, onBack, onSettings}) {
+  return (
+    <header className="w-full bg-kaiBurgundy text-white flex flex-col items-center py-5 shadow-md mb-5 relative shrink-0">
+      <img src={LOGO_URL} alt="Kai Ika" className="h-12 mb-2 object-contain" />
+      <h1 className="text-2xl font-serif font-bold text-center leading-tight">Coffee Cart</h1>
+      {subtitle && <p className="text-orange-200 mt-0.5 text-xs tracking-wide opacity-90">{subtitle}</p>}
       {onBack && (
         <button type="button" onClick={onBack}
-          className="absolute top-4 left-4 text-white/80 hover:text-white transition-colors">
+          className="absolute top-4 left-4 text-white/80 hover:text-white p-1">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
@@ -307,7 +430,7 @@ function Header({subtitle, onBack, onSettings, extraRight}) {
       )}
       {onSettings && (
         <button type="button" onClick={onSettings}
-          className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors">
+          className="absolute top-4 right-4 text-white/80 hover:text-white p-1">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -315,14 +438,13 @@ function Header({subtitle, onBack, onSettings, extraRight}) {
           </svg>
         </button>
       )}
-      {extraRight && <div className="absolute top-4 right-4">{extraRight}</div>}
     </header>
   );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 // SETUP SCREEN
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 function SetupScreen({onSave}) {
   const [url, setUrl] = useState(localStorage.getItem(WEB_APP_KEY)||"");
   return (
@@ -332,380 +454,347 @@ function SetupScreen({onSave}) {
         <h1 className="text-2xl font-serif text-center text-kaiBurgundy mb-1">Coffee Cart Setup</h1>
         <p className="text-sm text-gray-400 text-center mb-6">Enter your Google Apps Script Web App URL</p>
         <input className={inp+" mb-4"} placeholder="https://script.google.com/macros/s/..."
-          value={url} onChange={e=>setUrl(e.target.value)} />
-        <button className="w-full bg-kaiBurgundy hover:bg-red-800 text-white py-2.5 rounded-xl font-semibold transition-colors"
-          onClick={()=>{ if(!url.trim()){alert("Please enter a URL");return;} onSave(url.trim()); }}>
+          value={url} onChange={e=>setUrl(e.target.value)}/>
+        <Btn onClick={()=>{ if(!url.trim()){alert("Please enter a URL");return;} onSave(url.trim()); }}
+          className="w-full bg-kaiBurgundy text-white py-3 text-sm">
           Save & Continue
-        </button>
+        </Btn>
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 // HOME SCREEN
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 function HomeScreen({onNav, onSettings, hasActiveEvent}) {
-  const cards = [
-    { id:"event",     icon:"☕", label:"Sales Report", desc:"Manage today's event, POS and submit report",   color:"bg-kaiBurgundy hover:bg-red-900" },
-    { id:"stock",     icon:"📦", label:"Check Stock",  desc:"View stock levels and log reorders",             color:"bg-kaiGreen hover:bg-green-800" },
-    { id:"dashboard", icon:"📊", label:"Dashboard",    desc:"Summary of events, sales totals, stock overview",color:"bg-kaiBlue hover:bg-blue-900" },
-  ];
   return (
-    <div className="max-w-xl mx-auto p-4 md:p-8">
+    <div className="min-h-screen flex flex-col">
       <Header onSettings={onSettings}/>
-      {hasActiveEvent && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-800">
-          <span>⚡</span>
-          <span>You have an active event in progress</span>
-          <button onClick={()=>onNav("event")} className="ml-auto text-xs bg-amber-200 hover:bg-amber-300 px-2 py-1 rounded-lg font-semibold transition-colors">Continue →</button>
+      <div className="flex-1 max-w-2xl w-full mx-auto px-4 pb-8">
+        {hasActiveEvent && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3 text-sm text-amber-800">
+            <span className="text-lg">⚡</span>
+            <span className="flex-1 font-medium">Event in progress</span>
+            <Btn onClick={()=>onNav("event")} className="bg-amber-200 hover:bg-amber-300 text-amber-900 px-3 py-1.5 text-xs">
+              Continue →
+            </Btn>
+          </div>
+        )}
+        <div className="space-y-3">
+          {[
+            { id:"event",     icon:"☕", label:"Sales Report",   desc:"Manage today's event, POS and submit report",    color:"bg-kaiBurgundy" },
+            { id:"stock",     icon:"📦", label:"Check Stock",    desc:"View stock levels and log reorders",              color:"bg-kaiGreen" },
+            { id:"dashboard", icon:"📊", label:"Dashboard",      desc:"Events, revenue, cost breakdown and P&L",         color:"bg-kaiBlue" },
+          ].map(c=>(
+            <Btn key={c.id} onClick={()=>onNav(c.id)}
+              className={`w-full ${c.color} text-white p-5 text-left flex items-center gap-4 shadow-sm`}>
+              <span className="text-3xl">{c.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-lg font-serif font-bold">{c.label}</div>
+                <div className="text-xs opacity-75 mt-0.5">{c.desc}</div>
+              </div>
+              <svg className="h-5 w-5 opacity-40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+              </svg>
+            </Btn>
+          ))}
         </div>
-      )}
-      <div className="space-y-3 mt-1">
-        {cards.map(c=>(
-          <button key={c.id} onClick={()=>onNav(c.id)}
-            className={`w-full ${c.color} text-white rounded-xl shadow p-5 text-left flex items-center gap-4 transition-all active:scale-[0.98]`}>
-            <span className="text-3xl">{c.icon}</span>
-            <div className="flex-1">
-              <div className="text-lg font-serif font-bold">{c.label}</div>
-              <div className="text-xs opacity-75 mt-0.5">{c.desc}</div>
-            </div>
-            <svg className="h-5 w-5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-            </svg>
-          </button>
-        ))}
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 // POS SCREEN
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 function POSScreen({event, onUpdateEvent, onBack}) {
-  // Active order being built
+  const [activeCat, setActiveCat] = useState("hot");
+  const [showSaved, setShowSaved] = useState(false);
+  const [payModal,  setPayModal]  = useState(false);
+  const [toast,     setToast]     = useState(null);
+
+  // Active order in progress
   const [activeOrderId, setActiveOrderId] = useState(null);
-  const [orderName, setOrderName] = useState("");
-  const [currentItems, setCurrentItems] = useState([]); // [{menuId, qty, altMilk, customPrice}]
-  const [activeCat, setActiveCat] = useState("coffee");
-  const [showSavedOrders, setShowSavedOrders] = useState(false);
-  const [payModal, setPayModal] = useState(false); // show payment screen
-  const [toast, setToast] = useState(null);
+  const [orderName,     setOrderName]     = useState("");
+  const [currentItems,  setCurrentItems]  = useState([]);
 
   const showToast = (msg, color="bg-kaiGreen") => {
-    setToast({msg,color});
-    setTimeout(()=>setToast(null),2000);
+    setToast({msg,color}); setTimeout(()=>setToast(null),2000);
   };
 
-  const orders = event.orders || [];
-  const openOrders = orders.filter(o=>o.status==="open"||o.status==="saved");
-  const paidOrders = orders.filter(o=>o.status==="paid");
+  const orders      = event.orders||[];
+  const openOrders  = orders.filter(o=>o.status==="saved");
+  const paidOrders  = orders.filter(o=>o.status==="paid");
+  const paidTotal   = paidOrders.reduce((s,o)=>s+o.total,0);
 
-  const updateOrders = (newOrders) => {
-    const updated = {...event, orders: newOrders};
-    onUpdateEvent(updated);
-  };
+  const updateOrders = newOrders => onUpdateEvent({...event, orders: newOrders});
 
-  // Calc current order total
-  const orderTotal = useMemo(()=>{
-    return currentItems.reduce((sum,item)=>{
-      const def = MENU.find(m=>m.id===item.menuId);
+  // Order total
+  const orderTotal = useMemo(()=>
+    currentItems.reduce((sum,item)=>{
+      const def  = MENU.find(m=>m.id===item.menuId);
       if (!def) return sum;
       const base = def.customPrice ? (parseFloat(item.customPrice)||0) : def.price;
-      const alt  = item.altMilk ? 1 : 0;
-      return sum + (base + alt) * item.qty;
-    }, 0);
-  }, [currentItems]);
+      return sum + (base + (item.altMilk?1:0)) * item.qty;
+    },0)
+  ,[currentItems]);
 
-  const startNewOrder = () => {
-    setActiveOrderId(uid());
-    setOrderName("");
-    setCurrentItems([]);
-  };
+  // Merge key: menuId + altMilk status (same drink+same milk → same line)
+  const mergeKey = (menuId, altMilk) => `${menuId}:${altMilk?1:0}`;
 
-  const loadOrder = (order) => {
-    setActiveOrderId(order.id);
-    setOrderName(order.name||"");
-    setCurrentItems(order.items||[]);
-    setShowSavedOrders(false);
-  };
-
-  const saveCurrentOrder = () => {
-    if (!currentItems.length) { showToast("Add items first","bg-kaiBurgundy"); return; }
-    const newOrder = {
-      id: activeOrderId || uid(),
-      name: orderName,
-      items: currentItems,
-      total: orderTotal,
-      status: "saved",
-      savedAt: new Date().toISOString(),
-    };
-    const existing = orders.findIndex(o=>o.id===activeOrderId);
-    let newOrders;
-    if (existing>=0) {
-      newOrders = orders.map(o=>o.id===activeOrderId ? newOrder : o);
-    } else {
-      newOrders = [...orders, newOrder];
+  const addItem = (menuDef) => {
+    if (!activeOrderId) setActiveOrderId(uid());
+    if (menuDef.customPrice) {
+      // Custom price items always get a new line
+      setCurrentItems(prev=>[...prev, {id:uid(), menuId:menuDef.id, qty:1, altMilk:false, customPrice:""}]);
+      return;
     }
+    setCurrentItems(prev=>{
+      const mk  = mergeKey(menuDef.id, false);
+      const idx = prev.findIndex(i=>i.mergeKey===mk);
+      if (idx>=0) return prev.map((i,j)=>j===idx?{...i,qty:i.qty+1}:i);
+      return [...prev, {id:uid(), menuId:menuDef.id, qty:1, altMilk:false, mergeKey:mk}];
+    });
+  };
+
+  const toggleAltMilk = (lineId) => {
+    setCurrentItems(prev=>prev.map(item=>{
+      if (item.id !== lineId) return item;
+      const newAlt = !item.altMilk;
+      // When toggling, check if a line with this new state already exists
+      const newMk = mergeKey(item.menuId, newAlt);
+      const exists = prev.find(i=>i.id!==lineId && i.mergeKey===newMk);
+      if (exists) {
+        // Merge into existing line, remove this one
+        return null; // filtered below
+      }
+      return {...item, altMilk:newAlt, mergeKey:newMk};
+    }).filter(Boolean).map((item, _, arr)=>{
+      // After filter, check if a duplicate mergeKey now exists and merge
+      return item;
+    }));
+    // Simpler: just toggle and let them coexist as separate lines (covers edge case)
+    setCurrentItems(prev=>prev.map(item=>{
+      if (item.id !== lineId) return item;
+      const newAlt = !item.altMilk;
+      return {...item, altMilk:newAlt, mergeKey:mergeKey(item.menuId, newAlt)};
+    }));
+  };
+
+  const updateQty = (lineId, delta) => {
+    setCurrentItems(prev=>
+      prev.map(i=>i.id===lineId?{...i,qty:Math.max(0,i.qty+delta)}:i)
+          .filter(i=>i.qty>0)
+    );
+  };
+
+  const clearOrder = () => {
+    setActiveOrderId(null); setOrderName(""); setCurrentItems([]);
+  };
+
+  const saveOrder = () => {
+    if (!currentItems.length){ showToast("Add items first","bg-kaiBurgundy"); return; }
+    const order = { id:activeOrderId||uid(), name:orderName, items:currentItems, total:orderTotal, status:"saved", savedAt:new Date().toISOString() };
+    const existing = orders.findIndex(o=>o.id===activeOrderId);
+    const newOrders = existing>=0 ? orders.map(o=>o.id===activeOrderId?order:o) : [...orders,order];
     updateOrders(newOrders);
-    setActiveOrderId(newOrder.id);
+    clearOrder();
     showToast("Order saved");
   };
 
+  const loadOrder = (order) => {
+    setActiveOrderId(order.id); setOrderName(order.name||"");
+    setCurrentItems(order.items||[]); setShowSaved(false);
+  };
+
   const markPaid = (method) => {
-    if (!currentItems.length) { showToast("Add items first","bg-kaiBurgundy"); return; }
-    const newOrder = {
-      id: activeOrderId || uid(),
-      name: orderName,
-      items: currentItems,
-      total: orderTotal,
-      status: "paid",
-      payMethod: method,
-      paidAt: new Date().toISOString(),
-    };
+    if (!currentItems.length){ showToast("Add items first","bg-kaiBurgundy"); return; }
+    const order = { id:activeOrderId||uid(), name:orderName, items:currentItems, total:orderTotal, status:"paid", payMethod:method, paidAt:new Date().toISOString() };
     const existing = orders.findIndex(o=>o.id===activeOrderId);
-    let newOrders;
-    if (existing>=0) {
-      newOrders = orders.map(o=>o.id===activeOrderId ? newOrder : o);
-    } else {
-      newOrders = [...orders, newOrder];
-    }
+    const newOrders = existing>=0 ? orders.map(o=>o.id===activeOrderId?order:o) : [...orders,order];
     updateOrders(newOrders);
-    setActiveOrderId(null);
-    setOrderName("");
-    setCurrentItems([]);
-    setPayModal(false);
-    showToast(`✓ Paid by ${method}`);
-  };
-
-  const addItem = (menuItem) => {
-    if (!activeOrderId) {
-      const newId = uid();
-      setActiveOrderId(newId);
-      setOrderName("");
-    }
-    setCurrentItems(prev=>{
-      const existing = prev.findIndex(i=>i.menuId===menuItem.id && !menuItem.customPrice);
-      if (existing>=0 && !menuItem.customPrice) {
-        return prev.map((i,idx)=>idx===existing ? {...i, qty:i.qty+1} : i);
-      }
-      return [...prev, {menuId:menuItem.id, qty:1, altMilk:false, customPrice:menuItem.customPrice ? "" : undefined}];
-    });
-  };
-
-  const toggleAltMilk = (idx) => {
-    setCurrentItems(prev=>prev.map((i,j)=>j===idx ? {...i, altMilk:!i.altMilk} : i));
-  };
-
-  const updateQty = (idx, delta) => {
-    setCurrentItems(prev=>{
-      const updated = prev.map((i,j)=>j===idx ? {...i, qty:Math.max(0, i.qty+delta)} : i);
-      return updated.filter(i=>i.qty>0);
-    });
+    clearOrder(); setPayModal(false);
+    showToast(`✓ ${fmt(order.total)} — paid by ${method}`);
   };
 
   const catItems = MENU.filter(m=>m.cat===activeCat);
 
-  const itemLabel = (item) => {
-    const def = MENU.find(m=>m.id===item.menuId);
-    if (!def) return item.menuId;
-    const base = def.customPrice ? (parseFloat(item.customPrice)||0) : def.price;
-    const alt = item.altMilk ? 1 : 0;
-    const price = base + alt;
-    return `${def.label}${def.size?" "+def.size:""}${item.altMilk?" (Oat)":""} — ${fmt(price * item.qty)}`;
-  };
-
   return (
-    <div className="max-w-xl mx-auto flex flex-col h-screen overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-gray-50" style={{zIndex:50}}>
       {toast && <Toast msg={toast.msg} color={toast.color}/>}
 
       {/* POS Header */}
-      <div className="bg-coffeeBrown text-white px-4 py-3 flex items-center gap-3 shrink-0">
-        <button onClick={onBack} className="text-white/70 hover:text-white">
+      <div className="bg-coffeeBrown text-white px-3 py-2.5 flex items-center gap-2 shrink-0 shadow-md">
+        <button onClick={onBack} className="p-1 text-white/70 hover:text-white">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
-        <div className="flex-1">
-          <div className="font-serif font-bold text-lg">☕ POS</div>
-          <div className="text-xs text-white/60">{event.eventName||"Event"}</div>
+        <div className="flex-1 min-w-0">
+          <span className="font-serif font-bold text-base">☕ POS</span>
+          <span className="text-white/50 text-xs ml-2">{event.eventName||"Event"}</span>
         </div>
-        {/* Saved orders button */}
-        <div className="relative">
-          <button onClick={()=>setShowSavedOrders(v=>!v)}
-            className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1">
-            <span>Orders</span>
-            {openOrders.length > 0 && <span className="bg-amber-400 text-amber-900 text-xs rounded-full px-1.5 py-0.5 font-bold ml-1">{openOrders.length}</span>}
-          </button>
-          {showSavedOrders && (
-            <div className="absolute right-0 top-10 bg-white text-gray-800 rounded-xl shadow-xl w-72 z-50 overflow-hidden border border-gray-100">
-              <div className="px-3 py-2 bg-gray-50 border-b flex items-center justify-between">
-                <span className="font-semibold text-sm">Open Orders</span>
-                <button onClick={()=>setShowSavedOrders(false)} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-white/60">{paidOrders.length} paid · {fmt(paidTotal)}</span>
+          <div className="relative">
+            <button onClick={()=>setShowSaved(v=>!v)}
+              className="bg-white/15 hover:bg-white/25 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors">
+              <span>Orders</span>
+              {openOrders.length>0 && <span className="bg-amber-400 text-amber-900 text-[10px] rounded-full px-1.5 font-bold">{openOrders.length}</span>}
+            </button>
+            {showSaved && (
+              <div className="absolute right-0 top-9 bg-white text-gray-800 rounded-xl shadow-2xl w-64 z-50 border border-gray-100 overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center">
+                  <span className="font-semibold text-xs text-gray-600">SAVED ORDERS</span>
+                  <button onClick={()=>setShowSaved(false)} className="text-gray-400 text-xs">✕</button>
+                </div>
+                {openOrders.length===0
+                  ? <p className="px-4 py-3 text-sm text-gray-400">No saved orders</p>
+                  : openOrders.map(o=>(
+                    <button key={o.id} onClick={()=>loadOrder(o)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-50 flex justify-between items-center">
+                      <div>
+                        <div className="text-sm font-medium">{o.name||<span className="text-gray-400 italic font-normal">Unnamed</span>}</div>
+                        <div className="text-xs text-gray-400">{o.items.length} item{o.items.length!==1?"s":""}</div>
+                      </div>
+                      <div className="text-sm font-bold text-kaiGreen">{fmt(o.total)}</div>
+                    </button>
+                  ))
+                }
+                <div className="p-2 bg-gray-50 border-t">
+                  <button onClick={()=>{clearOrder();setShowSaved(false);}}
+                    className="w-full bg-coffeeBrown text-white py-1.5 rounded-lg text-xs font-semibold">
+                    + New Order
+                  </button>
+                </div>
               </div>
-              {openOrders.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-gray-400">No open orders</p>
-              ) : openOrders.map(o=>(
-                <button key={o.id} onClick={()=>loadOrder(o)}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-50 flex items-center justify-between transition-colors">
-                  <div>
-                    <div className="text-sm font-medium">{o.name||<span className="text-gray-400 italic">Unnamed</span>}</div>
-                    <div className="text-xs text-gray-400">{o.items.length} item{o.items.length!==1?"s":""}</div>
-                  </div>
-                  <div className="text-sm font-bold text-kaiGreen">{fmt(o.total)}</div>
-                </button>
-              ))}
-              <div className="px-3 py-2 bg-gray-50 border-t">
-                <button onClick={()=>{startNewOrder(); setShowSavedOrders(false);}}
-                  className="w-full bg-kaiBurgundy text-white py-1.5 rounded-lg text-sm font-semibold">
-                  + New Order
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Menu Categories */}
-        <div className="flex bg-white border-b border-gray-100 shrink-0">
-          {CAT_ORDER.map(cat=>(
-            <button key={cat} onClick={()=>setActiveCat(cat)}
-              className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${activeCat===cat ? "text-kaiBurgundy border-b-2 border-kaiBurgundy" : "text-gray-400"}`}>
-              {CAT_LABELS[cat]}
-            </button>
-          ))}
+      {/* Category tabs */}
+      <div className="flex bg-white border-b border-gray-100 shrink-0">
+        {CAT_ORDER.map(cat=>(
+          <button key={cat} onClick={()=>setActiveCat(cat)}
+            className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${activeCat===cat?"text-kaiBurgundy border-b-2 border-kaiBurgundy":"text-gray-400 hover:text-gray-600"}`}>
+            {CAT_LABELS[cat]}
+          </button>
+        ))}
+      </div>
+
+      {/* Main area: menu + order panel */}
+      <div className="flex flex-1 min-h-0 pos-grid">
+        {/* Menu grid */}
+        <div className="overflow-y-auto p-2 bg-gray-50">
+          {!activeOrderId && currentItems.length===0 && (
+            <div className="mb-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+              Tap an item to start an order
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            {catItems.map(item=>(
+              <button key={item.id} onClick={()=>addItem(item)}
+                className="bg-white hover:bg-kaiYellow border border-gray-100 rounded-xl p-3 text-left shadow-sm active:scale-95 transition-all">
+                <div className="font-semibold text-sm text-gray-800 leading-tight">{item.label}</div>
+                {item.size && <div className="text-xs text-gray-400 mt-0.5">{item.size}</div>}
+                <div className="text-sm font-bold text-kaiGreen mt-1">
+                  {item.customPrice?"Custom":fmt(item.price)}
+                  {item.altMilk && <span className="text-xs text-gray-400 font-normal ml-1">+$1 oat</span>}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Menu Grid */}
-          <div className="flex-1 overflow-y-auto p-3 bg-gray-50">
-            {!activeOrderId && (
-              <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
-                Tap any item to start a new order
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              {catItems.map(item=>(
-                <button key={item.id} onClick={()=>addItem(item)}
-                  className="bg-white hover:bg-kaiYellow border border-gray-100 rounded-xl p-3 text-left shadow-sm active:scale-95 transition-all">
-                  <div className="font-semibold text-sm text-gray-800">{item.label}</div>
-                  {item.size && <div className="text-xs text-gray-400 mt-0.5">{item.size}</div>}
-                  <div className="text-sm font-bold text-kaiGreen mt-1">
-                    {item.customPrice ? "Custom" : fmt(item.price)}
-                    {item.altMilk && <span className="text-xs text-gray-400 font-normal ml-1">+$1 oat</span>}
-                  </div>
-                </button>
-              ))}
-            </div>
+        {/* Order panel */}
+        <div className="flex flex-col bg-white border-l border-gray-100 min-h-0">
+          {/* Customer name */}
+          <div className="px-2 pt-2 pb-1.5 border-b border-gray-100 shrink-0">
+            <input className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-sans focus:outline-none"
+              placeholder="Name (optional)" value={orderName} onChange={e=>setOrderName(e.target.value)}/>
           </div>
 
-          {/* Order Panel */}
-          <div className="w-48 flex flex-col bg-white border-l border-gray-100 shrink-0">
-            {/* Order name */}
-            <div className="px-2 pt-2 pb-1 border-b border-gray-50">
-              <input
-                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-kaiGreen/40"
-                placeholder="Customer name (optional)"
-                value={orderName}
-                onChange={e=>setOrderName(e.target.value)}
-              />
-            </div>
-
-            {/* Items list */}
-            <div className="flex-1 overflow-y-auto p-1 space-y-1">
-              {currentItems.length === 0 ? (
-                <p className="text-xs text-gray-300 text-center pt-4 px-2">Tap items to add</p>
-              ) : currentItems.map((item,idx)=>{
+          {/* Items */}
+          <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
+            {currentItems.length===0
+              ? <p className="text-xs text-gray-300 text-center pt-4 px-2">Tap items to add →</p>
+              : currentItems.map(item=>{
                 const def = MENU.find(m=>m.id===item.menuId);
-                const basePrice = def?.customPrice ? (parseFloat(item.customPrice)||0) : (def?.price||0);
-                const lineTotal = (basePrice + (item.altMilk?1:0)) * item.qty;
+                const base = def?.customPrice?(parseFloat(item.customPrice)||0):(def?.price||0);
+                const line = (base+(item.altMilk?1:0))*item.qty;
                 return (
-                  <div key={idx} className="bg-gray-50 rounded-lg p-1.5 text-xs">
-                    <div className="flex items-start justify-between gap-1">
+                  <div key={item.id} className="bg-gray-50 rounded-lg p-1.5 text-xs">
+                    <div className="flex gap-1 items-start">
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-800 truncate">
+                        <div className="font-semibold text-gray-800 truncate leading-tight">
                           {def?.label}{def?.size?" "+def.size:""}
+                          {item.altMilk && <span className="text-kaiGreen"> (Oat)</span>}
                         </div>
                         {def?.customPrice && (
-                          <input
-                            className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs mt-0.5"
-                            placeholder="$ price"
-                            value={item.customPrice||""}
-                            onChange={e=>setCurrentItems(prev=>prev.map((x,j)=>j===idx?{...x,customPrice:e.target.value}:x))}
-                          />
+                          <input className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs mt-0.5"
+                            placeholder="$ price" value={item.customPrice||""}
+                            onChange={e=>setCurrentItems(prev=>prev.map(i=>i.id===item.id?{...i,customPrice:e.target.value}:i))}/>
                         )}
                         {def?.altMilk && (
-                          <button onClick={()=>toggleAltMilk(idx)}
-                            className={`mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${item.altMilk ? "bg-kaiGreen text-white" : "bg-gray-200 text-gray-500"}`}>
-                            Oat {item.altMilk ? "✓" : "+$1"}
+                          <button onClick={()=>toggleAltMilk(item.id)}
+                            className={`mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${item.altMilk?"bg-kaiGreen text-white":"bg-gray-200 text-gray-500"}`}>
+                            {item.altMilk?"Oat ✓":"+ Oat"}
                           </button>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="font-bold text-kaiGreen">{fmt(lineTotal)}</div>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <button onClick={()=>updateQty(idx,-1)} className="w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded text-gray-600 flex items-center justify-center font-bold">−</button>
-                          <span className="w-4 text-center font-bold">{item.qty}</span>
-                          <button onClick={()=>updateQty(idx,1)} className="w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded text-gray-600 flex items-center justify-center font-bold">+</button>
+                        <div className="font-bold text-kaiBurgundy">{fmt(line)}</div>
+                        <div className="flex items-center gap-0.5 mt-0.5 justify-end">
+                          <button onClick={()=>updateQty(item.id,-1)} className="w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold flex items-center justify-center">−</button>
+                          <span className="w-5 text-center font-bold">{item.qty}</span>
+                          <button onClick={()=>updateQty(item.id,+1)} className="w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold flex items-center justify-center">+</button>
                         </div>
                       </div>
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              })
+            }
+          </div>
 
-            {/* Order total + actions */}
-            <div className="border-t border-gray-100 p-2 space-y-1.5 shrink-0">
-              <div className="flex justify-between items-center px-1">
-                <span className="text-xs text-gray-500">Total</span>
-                <span className="text-lg font-serif font-bold text-kaiBurgundy">{fmt(orderTotal)}</span>
-              </div>
-              <button onClick={saveCurrentOrder}
-                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 rounded-lg text-xs font-semibold transition-colors">
-                Save Order
-              </button>
-              <button onClick={()=>currentItems.length?setPayModal(true):showToast("Add items first","bg-kaiBurgundy")}
-                className="w-full bg-kaiGreen hover:bg-green-700 text-white py-2 rounded-lg text-sm font-bold transition-colors">
-                Pay →
-              </button>
+          {/* Total + actions */}
+          <div className="border-t border-gray-100 p-2 space-y-1.5 shrink-0 safe-bottom">
+            <div className="flex justify-between items-center px-0.5">
+              <span className="text-xs text-gray-500">Total</span>
+              <span className="text-xl font-serif font-bold text-kaiBurgundy">{fmt(orderTotal)}</span>
             </div>
+            <button onClick={saveOrder}
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-semibold transition-colors">
+              Save Order
+            </button>
+            <button onClick={()=>currentItems.length?setPayModal(true):showToast("Add items first","bg-kaiBurgundy")}
+              className="w-full bg-kaiGreen hover:bg-green-700 text-white py-2.5 rounded-xl text-sm font-bold transition-colors">
+              Pay →
+            </button>
           </div>
         </div>
-
-        {/* Paid orders summary bar */}
-        {paidOrders.length > 0 && (
-          <div className="shrink-0 bg-kaiGreen/10 border-t border-kaiGreen/20 px-4 py-2 flex items-center justify-between text-sm">
-            <span className="text-kaiGreen font-semibold">{paidOrders.length} paid order{paidOrders.length!==1?"s":""}</span>
-            <span className="font-bold text-kaiGreen">{fmt(paidOrders.reduce((s,o)=>s+o.total,0))}</span>
-          </div>
-        )}
       </div>
 
       {/* Payment modal */}
       {payModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4">
-            <h2 className="text-2xl font-serif font-bold text-center text-kaiBurgundy">
-              {fmt(orderTotal)}
-            </h2>
-            <p className="text-center text-sm text-gray-500">Select payment method</p>
+        <div className="absolute inset-0 bg-black/60 flex items-end justify-center p-4" style={{zIndex:60}}>
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4 safe-bottom">
+            <h2 className="text-3xl font-serif font-bold text-center text-kaiBurgundy">{fmt(orderTotal)}</h2>
+            {orderName && <p className="text-center text-sm text-gray-500">{orderName}</p>}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={()=>markPaid("cash")}
-                className="bg-kaiGreen hover:bg-green-700 text-white py-4 rounded-xl text-lg font-bold transition-colors">
+                className="bg-kaiGreen hover:bg-green-700 text-white py-5 rounded-xl text-lg font-bold transition-colors active:scale-95">
                 💵 Cash
               </button>
               <button onClick={()=>markPaid("eftpos")}
-                className="bg-kaiBlue hover:bg-blue-900 text-white py-4 rounded-xl text-lg font-bold transition-colors">
+                className="bg-kaiBlue hover:bg-blue-900 text-white py-5 rounded-xl text-lg font-bold transition-colors active:scale-95">
                 💳 Eftpos
               </button>
             </div>
             <button onClick={()=>setPayModal(false)}
-              className="w-full text-gray-400 hover:text-gray-600 py-2 text-sm transition-colors">
-              Cancel
-            </button>
+              className="w-full text-gray-400 py-2 text-sm hover:text-gray-600">Cancel</button>
           </div>
         </div>
       )}
@@ -713,38 +802,39 @@ function POSScreen({event, onUpdateEvent, onBack}) {
   );
 }
 
-// ─────────────────────────────────────────────
-// ORDER HISTORY (inside event screen)
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// ORDER HISTORY (collapsible list)
+// ═══════════════════════════════════════════════════════
 function OrderHistory({orders}) {
-  const [expanded, setExpanded] = useState(null);
-  if (!orders || orders.length === 0) return null;
+  const [open, setOpen] = useState(null);
+  if (!orders?.length) return null;
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {[...orders].reverse().map(order=>{
-        const isOpen = expanded === order.id;
-        const statusColor = order.status==="paid" ? "bg-kaiGreen text-white" : "bg-amber-100 text-amber-800";
+        const isOpen = open===order.id;
         return (
           <div key={order.id} className="border border-gray-100 rounded-xl overflow-hidden">
-            <button onClick={()=>setExpanded(isOpen?null:order.id)}
-              className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors">
-              <div className="flex-1">
-                <div className="text-sm font-semibold text-gray-800">
-                  {order.name || <span className="text-gray-400 italic font-normal">Unnamed</span>}
+            <button onClick={()=>setOpen(isOpen?null:order.id)}
+              className="w-full px-3 py-2.5 flex items-center gap-2 text-left hover:bg-gray-50 transition-colors">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-gray-800 truncate">
+                  {order.name||<span className="text-gray-400 italic font-normal text-xs">Unnamed</span>}
                 </div>
-                <div className="text-xs text-gray-400">{order.items?.length} item{order.items?.length!==1?"s":""}</div>
+                <div className="text-xs text-gray-400">{order.items?.length} item{order.items?.length!==1?"s":""} · {order.status==="paid"?`${order.payMethod}`:"saved"}</div>
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusColor}`}>{order.status}</span>
-              <div className="text-sm font-bold text-kaiBurgundy">{fmt(order.total)}</div>
-              <svg className={`h-4 w-4 text-gray-300 transition-transform ${isOpen?"rotate-180":""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold shrink-0 ${order.status==="paid"?"bg-kaiGreen/10 text-kaiGreen":"bg-amber-100 text-amber-700"}`}>
+                {order.status}
+              </span>
+              <span className="font-bold text-sm text-kaiBurgundy shrink-0">{fmt(order.total)}</span>
+              <svg className={`h-4 w-4 text-gray-300 shrink-0 transition-transform ${isOpen?"rotate-180":""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
               </svg>
             </button>
             {isOpen && (
-              <div className="px-4 pb-3 bg-gray-50 border-t border-gray-100">
+              <div className="px-3 pb-3 bg-gray-50 border-t border-gray-100">
                 {order.items?.map((item,i)=>{
-                  const def = MENU.find(m=>m.id===item.menuId);
-                  const base = def?.customPrice ? (parseFloat(item.customPrice)||0) : (def?.price||0);
+                  const def  = MENU.find(m=>m.id===item.menuId);
+                  const base = def?.customPrice?(parseFloat(item.customPrice)||0):(def?.price||0);
                   return (
                     <div key={i} className="flex justify-between text-xs py-1 border-b border-gray-100 last:border-0">
                       <span className="text-gray-700">{def?.label}{def?.size?" "+def.size:""}{item.altMilk?" (Oat)":""} ×{item.qty}</span>
@@ -752,9 +842,7 @@ function OrderHistory({orders}) {
                     </div>
                   );
                 })}
-                {order.payMethod && (
-                  <div className="mt-2 text-xs text-gray-500">Paid by {order.payMethod}</div>
-                )}
+                {order.payMethod && <div className="text-xs text-gray-400 mt-2">Paid by {order.payMethod}</div>}
               </div>
             )}
           </div>
@@ -764,113 +852,142 @@ function OrderHistory({orders}) {
   );
 }
 
-// ─────────────────────────────────────────────
-// EVENT / SALES REPORT SCREEN
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// EVENT / SALES SCREEN
+// ═══════════════════════════════════════════════════════
 function EventScreen({webAppUrl, onBack}) {
-  const [event, setEvent]     = useState(()=>loadEvent()||blankEvent());
-  const [screen, setScreen]   = useState("event"); // event | pos
-  const [showSummary, setShowSummary] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast]     = useState(null);
-  const [copied, setCopied]   = useState(false);
-  const [showStockEdit, setShowStockEdit] = useState(false);
-  const [showSalesEdit, setShowSalesEdit] = useState(false);
+  const [event,      setEvent]      = useState(()=>loadEvent()||blankEvent());
+  const [posOpen,    setPosOpen]    = useState(false);
+  const [showSummary,setShowSummary]= useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [toast,      setToast]      = useState(null);
+  const [copied,     setCopied]     = useState(false);
+  const [submitError,setSubmitError]= useState(null);
+  const [editSales,  setEditSales]  = useState(false);
+  const [editStock,  setEditStock]  = useState(false);
+  const [editMoney,  setEditMoney]  = useState(false);
 
-  const showToast = (msg,color="bg-kaiGreen")=>{
-    setToast({msg,color});
-    setTimeout(()=>setToast(null), 3000);
-  };
+  const showToast = (msg,color="bg-kaiGreen")=>{ setToast({msg,color}); setTimeout(()=>setToast(null),4000); };
 
-  // Auto-save whenever event changes
+  // Auto-save
   useEffect(()=>{ saveEvent(event); }, [event]);
 
-  const upd = (key, val) => setEvent(prev=>({...prev, [key]:val}));
+  const upd = (key,val) => setEvent(prev=>({...prev,[key]:val}));
 
-  const addStaff = () => upd("staffRows", [...(event.staffRows||[]), {staffName:STAFF[0], startTime:"", endTime:""}]);
-  const removeStaff = i => upd("staffRows", event.staffRows.filter((_,j)=>j!==i));
+  // Resolved values
+  const resolved = useMemo(()=>resolveEvent(event),[event]);
+  const { activeSales, activeStock, cashVal, eftposVal, total } = resolved;
 
-  const addFridge = () => upd("fridgeReadings", [...(event.fridgeReadings||[]), {time:nowTime(), temp:""}]);
-  const removeFridge = i => upd("fridgeReadings", event.fridgeReadings.filter((_,j)=>j!==i));
-
-  // Derived values
-  const derivedSales  = useMemo(()=>deriveSalesFromOrders(event.orders||[]), [event.orders]);
-  const derivedStock  = useMemo(()=>deriveStockFromOrders(event.orders||[]),  [event.orders]);
-  const { cash, eftpos } = useMemo(()=>deriveCashEftpos(event.orders||[]),    [event.orders]);
-
-  const activeSales = event.salesOverride || derivedSales;
-  const activeStock = event.stockOverride || derivedStock;
-  const cashVal     = hasData(event.cashSales)   ? event.cashSales   : cash;
-  const eftposVal   = hasData(event.eftposSales) ? event.eftposSales : eftpos;
-  const totalSales  = (parseFloat(cashVal||0)+parseFloat(eftposVal||0)).toFixed(2);
-
+  // Stats
   const paidOrders = (event.orders||[]).filter(o=>o.status==="paid");
   const totalOrders = paidOrders.length;
-  const totalRevenue = paidOrders.reduce((s,o)=>s+o.total,0);
+  const posRevenue  = paidOrders.reduce((s,o)=>s+o.total,0);
+
+  // ── Handlers ─────────────────────────────────────────
+  const handleSalesEdit = (product, val) => {
+    const override = {...(event.salesOverride||activeSales)};
+    override[product] = val===""?0:parseInt(val)||0;
+    // Recalc stock from updated sales (unless stock locked)
+    setEvent(prev=>({
+      ...prev,
+      salesOverride: override,
+      salesLocked: true,
+      // Stock: if not manually locked, derive from new sales
+      stockOverride: prev.stockLocked ? prev.stockOverride : null,
+    }));
+  };
+
+  const handleStockEdit = (item, val) => {
+    const override = {...(event.stockOverride||activeStock)};
+    override[item] = val===""?0:parseFloat(val)||0;
+    upd("stockOverride", override);
+    upd("stockLocked", true);
+  };
+
+  const resetSales = () => setEvent(prev=>({...prev, salesOverride:null, salesLocked:false, stockOverride:null, stockLocked:false}));
+  const resetStock = () => setEvent(prev=>({...prev, stockOverride:null, stockLocked:false}));
+
+  const addStaff  = () => upd("staffRows", [...(event.staffRows||[]), {id:uid(), staffName:STAFF[0], startTime:"", endTime:""}]);
+  const rmStaff   = i  => upd("staffRows", event.staffRows.filter((_,j)=>j!==i));
+  const addFridge = () => upd("fridgeReadings", [...(event.fridgeReadings||[]), {id:uid(), time:nowTime(), temp:""}]);
+  const rmFridge  = i  => upd("fridgeReadings", event.fridgeReadings.filter((_,j)=>j!==i));
+
+  const doClear = () => {
+    if (!window.confirm("Clear all event data and return home?")) return;
+    clearEvent();
+    onBack();
+  };
 
   const submit = async () => {
     if (!event.date||!event.completedBy||!event.eventName) {
       showToast("Date, Event Name and Completed By required","bg-kaiBurgundy");
       return;
     }
-    if (!webAppUrl) { showToast("No Web App URL configured","bg-kaiBurgundy"); return; }
-    setLoading(true);
+    if (!webAppUrl) {
+      setSubmitError("No Web App URL configured. Please go to Settings and enter your Apps Script URL.");
+      return;
+    }
+    if (!navigator.onLine) {
+      setSubmitError("You appear to be offline. Your data is saved — please resubmit when you have a connection.");
+      return;
+    }
+    setLoading(true); setSubmitError(null);
     try {
       const fd = new FormData();
       fd.append("action","salesReport");
-      fd.append("date", event.date);
-      fd.append("eventName", event.eventName);
-      fd.append("location", event.location||"");
-      fd.append("completedBy", event.completedBy);
-      fd.append("timestamp", new Date().toISOString());
-      (event.staffRows||[]).forEach(r=>{
-        fd.append("staffName[]", r.staffName);
-        fd.append("staffStart[]", r.startTime);
-        fd.append("staffEnd[]", r.endTime);
-      });
-      Object.entries(activeSales).filter(([,v])=>v>0).forEach(([k,v])=>{
-        fd.append("saleProduct[]",k); fd.append("saleQty[]",v);
-      });
-      fd.append("cashSales",  cashVal||"0");
-      fd.append("eftposSales",eftposVal||"0");
-      fd.append("totalSales", totalSales);
-      Object.entries(activeStock).forEach(([k,v])=>{
-        fd.append("stockItem[]",k); fd.append("stockQty[]",v);
-      });
-      (event.fridgeReadings||[]).forEach(r=>{
-        fd.append("fridgeTime[]",r.time); fd.append("fridgeTemp[]",r.temp);
-      });
-      fd.append("crowdNotes",       event.crowdNotes||"");
-      fd.append("equipmentIssues",  event.equipmentIssues||"");
-      fd.append("legaseaSignups",   event.legaseaSignups||"");
-      fd.append("notes",            event.notes||"");
+      fd.append("date",          event.date);
+      fd.append("eventName",     event.eventName);
+      fd.append("location",      event.location||"");
+      fd.append("completedBy",   event.completedBy);
+      fd.append("timestamp",     new Date().toISOString());
+      (event.staffRows||[]).forEach(r=>{ fd.append("staffName[]",r.staffName); fd.append("staffStart[]",r.startTime); fd.append("staffEnd[]",r.endTime); });
+      Object.entries(activeSales).filter(([,v])=>v>0).forEach(([k,v])=>{ fd.append("saleProduct[]",k); fd.append("saleQty[]",v); });
+      fd.append("cashSales",   cashVal||"0");
+      fd.append("eftposSales", eftposVal||"0");
+      fd.append("totalSales",  total);
+      Object.entries(activeStock).forEach(([k,v])=>{ fd.append("stockItem[]",k); fd.append("stockQty[]",v); });
+      (event.fridgeReadings||[]).forEach(r=>{ fd.append("fridgeTime[]",r.time); fd.append("fridgeTemp[]",r.temp); });
+      fd.append("equipmentIssues", event.equipmentIssues||"");
+      fd.append("notes",           event.notes||"");
 
-      const res  = await fetch(webAppUrl, {method:"POST", body:fd});
+      const res  = await fetch(webAppUrl,{method:"POST",body:fd});
       const json = await res.json();
-      if (!json.success) throw new Error(json.error);
+      if (!json.success) throw new Error(json.error||"Unknown error from Apps Script");
       showToast("✓ Report submitted successfully");
       setShowSummary(false);
       clearEvent();
       setEvent(blankEvent());
     } catch(err) {
-      showToast("Error: "+err.message,"bg-kaiBurgundy");
+      const msg = err.message.includes("fetch")
+        ? "Could not reach the server. Check your connection and try again."
+        : `Submission failed: ${err.message}`;
+      setSubmitError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  if (screen === "pos") {
-    return <POSScreen event={event} onUpdateEvent={e=>{ setEvent(e); }} onBack={()=>setScreen("event")}/>;
+  if (posOpen) {
+    return <POSScreen event={event} onUpdateEvent={e=>{setEvent(e); saveEvent(e);}} onBack={()=>setPosOpen(false)}/>;
   }
 
   return (
-    <div className="max-w-xl mx-auto p-4 pb-8 md:p-8">
+    <div className="min-h-screen flex flex-col">
       {toast && <Toast msg={toast.msg} color={toast.color}/>}
       {copied && <Toast msg="✓ Copied to clipboard" color="bg-kaiBlue"/>}
-
       <Header subtitle={event.eventName||"Sales Report"} onBack={onBack}/>
 
-      <div className="space-y-4">
+      <div className="flex-1 max-w-2xl w-full mx-auto px-4 pb-24 space-y-4">
+
+        {/* Submit error banner */}
+        {submitError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">
+            <div className="font-semibold mb-1">⚠ Submission failed</div>
+            <div>{submitError}</div>
+            <div className="mt-2 text-xs text-red-600">Your data is saved locally. You can try again below.</div>
+          </div>
+        )}
+
         {/* Event Details */}
         <Card title="Event Details">
           <div className="grid grid-cols-2 gap-3">
@@ -890,152 +1007,164 @@ function EventScreen({webAppUrl, onBack}) {
         </Card>
 
         {/* POS Entry */}
-        <div className="bg-coffeeBrown text-white rounded-xl shadow p-5 flex items-center gap-4">
+        <div className="bg-coffeeBrown text-white rounded-xl p-4 flex items-center gap-4 shadow-sm">
           <div className="text-3xl">☕</div>
-          <div className="flex-1">
-            <div className="font-serif font-bold text-lg">Point of Sale</div>
-            <div className="text-xs text-white/70 mt-0.5">
-              {totalOrders} order{totalOrders!==1?"s":""} · {fmt(totalRevenue)} taken
-            </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-serif font-bold">Point of Sale</div>
+            <div className="text-xs text-white/60 mt-0.5">{totalOrders} order{totalOrders!==1?"s":""} · {fmt(posRevenue)} taken</div>
           </div>
-          <button onClick={()=>setScreen("pos")}
-            className="bg-white text-coffeeBrown hover:bg-kaiYellow px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow">
+          <Btn onClick={()=>setPosOpen(true)}
+            className="bg-white text-coffeeBrown hover:bg-kaiYellow px-4 py-2 text-sm shrink-0">
             Enter POS →
-          </button>
+          </Btn>
         </div>
 
         {/* Order History */}
-        {(event.orders||[]).length > 0 && (
-          <Card title={`Order History (${(event.orders||[]).length})`} color="text-coffeeBrown" bg="bg-amber-50">
+        {(event.orders||[]).length>0 && (
+          <Card title={`Orders (${(event.orders||[]).length})`} color="text-coffeeBrown" bg="bg-amber-50/50">
             <OrderHistory orders={event.orders||[]}/>
           </Card>
         )}
 
         {/* Sales Summary */}
-        <Card
-          title="Sales Summary"
+        <Card title="Sales Summary"
           action={
-            <button onClick={()=>setShowSalesEdit(v=>!v)}
-              className="text-xs text-kaiGreen font-semibold hover:underline">
-              {showSalesEdit?"Done":"Edit"}
-            </button>
+            <div className="flex items-center gap-2">
+              {event.salesLocked && <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Edited</span>}
+              <button onClick={()=>setEditSales(v=>!v)} className="text-xs text-kaiGreen font-semibold">
+                {editSales?"Done":"Edit"}
+              </button>
+            </div>
           }
         >
-          {showSalesEdit ? (
+          {editSales ? (
             <div className="space-y-3">
-              <p className="text-xs text-gray-400">Editing overrides auto-calculated values from POS</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              <p className="text-xs text-gray-400">Changes override POS values. Stock will recalculate automatically.</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 {ALL_REPORT_PRODUCTS.map(prod=>(
                   <div key={prod} className="flex items-center gap-2">
                     <span className="text-xs text-gray-700 flex-1 min-w-0 truncate">{prod}</span>
                     <input type="number" placeholder="0"
-                      className="w-16 border rounded-lg px-2 py-1 text-xs text-right"
-                      value={event.salesOverride?.[prod] ?? activeSales[prod] ?? ""}
-                      onChange={e=>{
-                        const override = {...(event.salesOverride||activeSales)};
-                        override[prod] = e.target.value === "" ? 0 : parseInt(e.target.value)||0;
-                        upd("salesOverride", override);
-                      }}
-                    />
+                      className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs text-right"
+                      value={activeSales[prod]??0}
+                      onChange={e=>handleSalesEdit(prod,e.target.value)}/>
                   </div>
                 ))}
               </div>
-              <button onClick={()=>{ upd("salesOverride",null); }}
-                className="text-xs text-gray-400 hover:text-red-500 underline">Reset to POS values</button>
+              {event.salesLocked && (
+                <button onClick={resetSales} className="text-xs text-gray-400 hover:text-red-500 underline">Reset to POS values</button>
+              )}
             </div>
           ) : (
             <div>
-              {Object.entries(activeSales).filter(([,v])=>v>0).length===0 ? (
-                <p className="text-sm text-gray-400 text-center py-2">No sales yet — enter via POS</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                  {Object.entries(activeSales).filter(([,v])=>v>0).map(([k,v])=>(
-                    <div key={k} className="flex justify-between text-sm py-0.5">
-                      <span className="text-gray-700">{k}</span>
-                      <span className="font-semibold">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-3 gap-3">
-                <Field label="Cash ($)">
-                  <input type="number" step="0.01" placeholder="0.00" className={inp}
-                    value={event.cashSales} onChange={e=>upd("cashSales",e.target.value)}/>
-                </Field>
-                <Field label="Eftpos ($)">
-                  <input type="number" step="0.01" placeholder="0.00" className={inp}
-                    value={event.eftposSales} onChange={e=>upd("eftposSales",e.target.value)}/>
-                </Field>
-                <Field label="Total">
-                  <div className={`${inp} bg-gray-50 font-semibold text-kaiGreen`}>${totalSales}</div>
-                </Field>
-              </div>
-              {(hasData(event.cashSales)||hasData(event.eftposSales)) && (
-                <p className="text-xs text-gray-400 mt-1">Cash/Eftpos manually entered (overrides POS)</p>
-              )}
+              {Object.entries(activeSales).filter(([,v])=>v>0).length===0
+                ? <p className="text-sm text-gray-400 text-center py-2">No sales yet — use the POS above</p>
+                : <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    {Object.entries(activeSales).filter(([,v])=>v>0).map(([k,v])=>(
+                      <div key={k} className="flex justify-between text-sm py-0.5">
+                        <span className="text-gray-700 text-xs">{k}</span>
+                        <span className="font-semibold text-xs">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+              }
             </div>
           )}
+
+          {/* Money totals */}
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-500">Payment Totals</span>
+              <button onClick={()=>setEditMoney(v=>!v)} className="text-xs text-kaiGreen font-semibold">
+                {editMoney?"Done":"Edit"}
+              </button>
+            </div>
+            {editMoney ? (
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="Cash ($)">
+                  <input type="number" step="0.01" placeholder={cashVal} className={inp}
+                    value={event.manualCash} onChange={e=>upd("manualCash",e.target.value)}/>
+                </Field>
+                <Field label="Eftpos ($)">
+                  <input type="number" step="0.01" placeholder={eftposVal} className={inp}
+                    value={event.manualEftpos} onChange={e=>upd("manualEftpos",e.target.value)}/>
+                </Field>
+                <Field label="Total">
+                  <div className={`${inp} bg-gray-50 font-bold text-kaiGreen text-center`}>${total}</div>
+                </Field>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {[["Cash","$"+cashVal,"text-kaiGreen"],["Eftpos","$"+eftposVal,"text-kaiBlue"],["Total","$"+total,"text-kaiBurgundy font-bold"]].map(([label,val,cls])=>(
+                  <div key={label} className="bg-gray-50 rounded-lg p-2">
+                    <div className={`text-sm font-bold ${cls}`}>{val}</div>
+                    <div className="text-xs text-gray-400">{label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {(hasData(event.manualCash)||hasData(event.manualEftpos)) && (
+              <button onClick={()=>{ upd("manualCash",""); upd("manualEftpos",""); }} className="text-xs text-gray-400 hover:text-red-500 underline mt-1">Reset to POS totals</button>
+            )}
+          </div>
         </Card>
 
         {/* Stock Used */}
-        <Card
-          title="Stock Used"
+        <Card title="Stock Used"
           action={
-            <button onClick={()=>setShowStockEdit(v=>!v)}
-              className="text-xs text-kaiGreen font-semibold hover:underline">
-              {showStockEdit?"Done":"Edit"}
-            </button>
+            <div className="flex items-center gap-2">
+              {event.stockLocked && <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Edited</span>}
+              <button onClick={()=>setEditStock(v=>!v)} className="text-xs text-kaiGreen font-semibold">
+                {editStock?"Done":"Edit"}
+              </button>
+            </div>
           }
         >
-          {showStockEdit ? (
+          {editStock ? (
             <div className="space-y-2">
-              <p className="text-xs text-gray-400">Editing overrides auto-calculated values</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              <p className="text-xs text-gray-400">Manual changes override all calculations.</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 {STOCK_ITEMS.map(item=>(
                   <div key={item} className="flex items-center gap-2">
                     <span className="text-xs text-gray-700 flex-1 min-w-0 truncate">{item}</span>
                     <input type="number" placeholder="0" step="0.001"
-                      className="w-16 border rounded-lg px-2 py-1 text-xs text-right"
-                      value={event.stockOverride?.[item] ?? activeStock[item] ?? ""}
-                      onChange={e=>{
-                        const override = {...(event.stockOverride||activeStock)};
-                        override[item] = e.target.value===""?0:parseFloat(e.target.value)||0;
-                        upd("stockOverride", override);
-                      }}
-                    />
+                      className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs text-right"
+                      value={activeStock[item]??0}
+                      onChange={e=>handleStockEdit(item,e.target.value)}/>
                   </div>
                 ))}
               </div>
-              <button onClick={()=>upd("stockOverride",null)}
-                className="text-xs text-gray-400 hover:text-red-500 underline">Reset to auto values</button>
+              {event.stockLocked && (
+                <button onClick={resetStock} className="text-xs text-gray-400 hover:text-red-500 underline">Reset to auto values</button>
+              )}
             </div>
           ) : (
             <div>
-              {Object.keys(activeStock).length===0 ? (
-                <p className="text-sm text-gray-400 text-center py-2">Auto-calculated from POS sales</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                  {STOCK_ITEMS.filter(k=>activeStock[k]>0).map(k=>(
-                    <div key={k} className="flex justify-between text-sm py-0.5">
-                      <span className="text-gray-700">{k}</span>
-                      <span className="font-semibold">{activeStock[k]}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {event.stockOverride && (
-                <p className="text-xs text-gray-400 mt-2">Manually overridden</p>
-              )}
+              {Object.entries(activeStock).filter(([,v])=>v>0).length===0
+                ? <p className="text-sm text-gray-400 text-center py-2">Auto-calculated from sales</p>
+                : <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    {STOCK_ITEMS.filter(k=>activeStock[k]>0).map(k=>(
+                      <div key={k} className="flex justify-between text-xs py-0.5">
+                        <span className="text-gray-700">{k}</span>
+                        <span className="font-semibold">{activeStock[k]}</span>
+                      </div>
+                    ))}
+                  </div>
+              }
+              <p className="text-xs text-gray-400 mt-2">
+                {event.stockLocked?"Manually overridden":event.salesLocked?"Calculated from edited sales":"Calculated from POS"}
+              </p>
             </div>
           )}
         </Card>
 
         {/* Staff */}
-        <Card title="Staff" action={<AddBtn onClick={addStaff} label="+ Add"/>}>
-          {(event.staffRows||[]).length===0 && <p className="text-sm text-gray-400 text-center py-1">No staff added</p>}
+        <Card title="Staff"
+          action={<button onClick={addStaff} className="bg-kaiBurgundy hover:bg-red-800 text-white px-3 py-1 rounded-lg text-xs font-semibold">+ Add</button>}>
+          {!(event.staffRows||[]).length && <p className="text-sm text-gray-400 text-center py-1">No staff added</p>}
           {(event.staffRows||[]).map((r,i)=>(
-            <div key={i} className="bg-kaiGreen/5 p-3 rounded-xl relative mb-2">
-              <RemoveBtn onClick={()=>removeStaff(i)}/>
+            <div key={r.id||i} className="bg-kaiGreen/5 p-3 rounded-xl relative mb-2">
+              <RemoveBtn onClick={()=>rmStaff(i)}/>
               <div className="grid grid-cols-3 gap-2">
                 <select className={inp} value={r.staffName}
                   onChange={e=>upd("staffRows", event.staffRows.map((x,j)=>j===i?{...x,staffName:e.target.value}:x))}>
@@ -1052,16 +1181,20 @@ function EventScreen({webAppUrl, onBack}) {
                     onChange={e=>upd("staffRows", event.staffRows.map((x,j)=>j===i?{...x,endTime:e.target.value}:x))}/>
                 </div>
               </div>
+              {calcHours(r.startTime,r.endTime)>0 && (
+                <div className="text-xs text-gray-400 mt-1.5 text-right">{calcHours(r.startTime,r.endTime)}h · {fmt(calcHours(r.startTime,r.endTime)*30)} staff cost</div>
+              )}
             </div>
           ))}
         </Card>
 
-        {/* Fridge Temp */}
-        <Card title="Fridge Temperature" action={<AddBtn onClick={addFridge} label="+ Reading"/>}>
-          {(event.fridgeReadings||[]).length===0 && <p className="text-sm text-gray-400 text-center py-1">No readings yet</p>}
+        {/* Fridge */}
+        <Card title="Fridge Temperature"
+          action={<button onClick={addFridge} className="bg-kaiBurgundy hover:bg-red-800 text-white px-3 py-1 rounded-lg text-xs font-semibold">+ Reading</button>}>
+          {!(event.fridgeReadings||[]).length && <p className="text-sm text-gray-400 text-center py-1">No readings yet</p>}
           {(event.fridgeReadings||[]).map((r,i)=>(
-            <div key={i} className="bg-blue-50 p-3 rounded-xl relative mb-2">
-              <RemoveBtn onClick={()=>removeFridge(i)}/>
+            <div key={r.id||i} className="bg-blue-50 p-3 rounded-xl relative mb-2">
+              <RemoveBtn onClick={()=>rmFridge(i)}/>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-[10px] text-gray-400 block mb-1">Time</span>
@@ -1078,60 +1211,57 @@ function EventScreen({webAppUrl, onBack}) {
           ))}
         </Card>
 
-        {/* Operational Notes */}
+        {/* Notes */}
         <Card title="Notes">
           <div className="space-y-3">
-            <Field label="Crowd Size & Busy Periods">
-              <textarea className={`${inp} h-20`} placeholder="e.g. ~500 people, busy 10–11am"
-                value={event.crowdNotes} onChange={e=>upd("crowdNotes",e.target.value)}/>
-            </Field>
-            <Field label="Equipment / Water / Power Issues">
-              <textarea className={`${inp} h-16`} placeholder="e.g. No issues"
-                value={event.equipmentIssues} onChange={e=>upd("equipmentIssues",e.target.value)}/>
-            </Field>
-            <Field label="LegaSea Signups (count)">
-              <input type="number" placeholder="0" className={inp}
-                value={event.legaseaSignups} onChange={e=>upd("legaseaSignups",e.target.value)}/>
+            <Field label="Issues (equipment, water, power, etc.)">
+              <textarea className={`${inp} h-20`} placeholder="e.g. No issues / Water pump slow in afternoon"
+                value={event.equipmentIssues||""} onChange={e=>upd("equipmentIssues",e.target.value)}/>
             </Field>
             <Field label="General Notes">
-              <textarea className={`${inp} h-20`} placeholder="Any other observations..."
-                value={event.notes} onChange={e=>upd("notes",e.target.value)}/>
+              <textarea className={`${inp} h-28`}
+                placeholder="Attendance & crowd size, busy periods, what went well, LegaSea email signups, any other observations..."
+                value={event.notes||""} onChange={e=>upd("notes",e.target.value)}/>
             </Field>
           </div>
         </Card>
 
         {/* Review button */}
-        <button onClick={()=>setShowSummary(true)}
-          className="w-full bg-kaiGreen hover:bg-green-700 text-white py-4 rounded-xl text-lg font-serif font-bold shadow transition-colors">
+        <Btn onClick={()=>setShowSummary(true)}
+          className="w-full bg-kaiGreen text-white py-4 text-base shadow-sm">
           Review & Submit
-        </button>
+        </Btn>
 
-        {/* Clear data button */}
-        <button onClick={()=>{ if(window.confirm("Clear all event data and start fresh?")){ clearEvent(); setEvent(blankEvent()); }}}
-          className="w-full text-gray-400 hover:text-red-400 py-2 text-sm transition-colors">
-          Clear & start new event
+        {/* Clear */}
+        <button onClick={doClear} className="w-full text-gray-400 hover:text-red-400 py-2 text-sm transition-colors">
+          Clear event & return home
         </button>
       </div>
 
-      {/* Summary modal */}
+      {/* Summary Modal */}
       {showSummary && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-kaiYellow w-full max-w-xl rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh] p-6 relative">
+          <div className="bg-kaiYellow w-full max-w-xl rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh] p-5 relative">
             <button onClick={()=>setShowSummary(false)}
-              className="absolute top-4 right-4 text-kaiBurgundy text-xl font-bold">✕</button>
-            <h2 className="text-2xl font-serif font-bold mb-4 text-kaiBurgundy">Report Summary</h2>
-            <pre className="whitespace-pre-wrap font-sans text-gray-800 text-sm bg-white p-4 rounded-xl">
+              className="absolute top-4 right-4 text-kaiBurgundy text-xl font-bold w-8 h-8 flex items-center justify-center">✕</button>
+            <h2 className="text-xl font-serif font-bold mb-4 text-kaiBurgundy">Report Summary</h2>
+            <pre className="whitespace-pre-wrap font-sans text-gray-800 text-xs bg-white p-4 rounded-xl leading-relaxed">
               {buildSummary(event)}
             </pre>
-            <button
-              onClick={()=>{ navigator.clipboard.writeText(buildSummary(event)); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
-              className="mt-4 w-full bg-kaiBlue hover:bg-blue-900 text-white py-2.5 rounded-xl font-semibold transition-colors">
+            {submitError && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-800">
+                <div className="font-semibold">⚠ Last submission failed</div>
+                <div className="text-xs mt-1">{submitError}</div>
+              </div>
+            )}
+            <Btn onClick={()=>{ navigator.clipboard.writeText(buildSummary(event)); setCopied(true); setTimeout(()=>setCopied(false),2000); }}
+              className="mt-3 w-full bg-kaiBlue text-white py-2.5 text-sm">
               Copy Summary
-            </button>
-            <button onClick={submit} disabled={loading}
-              className="mt-3 w-full bg-kaiBurgundy hover:bg-red-800 disabled:bg-gray-300 text-white py-3.5 rounded-xl text-lg font-serif font-bold shadow transition-colors">
+            </Btn>
+            <Btn onClick={submit} disabled={loading}
+              className={`mt-2 w-full py-3.5 text-base ${loading?"bg-gray-300 text-gray-500":"bg-kaiBurgundy text-white"}`}>
               {loading?"Saving…":"Submit Report"}
-            </button>
+            </Btn>
           </div>
         </div>
       )}
@@ -1139,38 +1269,34 @@ function EventScreen({webAppUrl, onBack}) {
   );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 // STOCK SCREEN
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 function StockScreen({webAppUrl, onBack}) {
-  const [tab, setTab] = useState("levels");
-  const [stockLevels, setStockLevels] = useState(null);
-  const [reorderLog, setReorderLog]   = useState([]);
-  const [loading, setLoading]         = useState(false);
-  const [toast, setToast]             = useState(null);
-  const [editLevels, setEditLevels]   = useState({});
-  const [submitting, setSubmitting]   = useState(false);
+  const [tab,          setTab]         = useState("levels");
+  const [stockLevels,  setStockLevels] = useState(null);
+  const [reorderLog,   setReorderLog]  = useState([]);
+  const [loading,      setLoading]     = useState(false);
+  const [submitting,   setSubmitting]  = useState(false);
+  const [toast,        setToast]       = useState(null);
+  const [editLevels,   setEditLevels]  = useState({});
+  const [reorderDate,  setReorderDate] = useState(todayStr());
+  const [supplier,     setSupplier]    = useState("");
+  const [reorderItems, setReorderItems]= useState(STOCK_ITEMS.map(item=>({item,qty:"",costPerUnit:""})));
 
-  // Reorder form state
-  const [reorderDate, setReorderDate] = useState(todayStr());
-  const [supplier, setSupplier]       = useState("");
-  const [reorderItems, setReorderItems] = useState(
-    STOCK_ITEMS.map(item=>({item, qty:"", costPerUnit:""}))
-  );
-
-  const showToast=(msg,color="bg-kaiGreen")=>{setToast({msg,color});setTimeout(()=>setToast(null),2500);};
+  const showToast=(msg,color="bg-kaiGreen")=>{ setToast({msg,color}); setTimeout(()=>setToast(null),2500); };
 
   const fetchStock = useCallback(async()=>{
-    if (!webAppUrl) return;
+    if (!webAppUrl){ showToast("No Web App URL set","bg-kaiBurgundy"); return; }
     setLoading(true);
     try {
       const res  = await fetch(`${webAppUrl}?action=getStock`);
       const data = await res.json();
-      if (data.success) { setStockLevels(data.stock); setReorderLog(data.reorderLog||[]); }
+      if (data.success){ setStockLevels(data.stock); setReorderLog(data.reorderLog||[]); }
       else showToast("Error: "+data.error,"bg-kaiBurgundy");
-    } catch(e){ showToast("Connection failed","bg-kaiBurgundy"); }
-    finally { setLoading(false); }
-  }, [webAppUrl]);
+    } catch{ showToast("Connection failed — check your URL","bg-kaiBurgundy"); }
+    finally{ setLoading(false); }
+  },[webAppUrl]);
 
   useEffect(()=>{ fetchStock(); },[fetchStock]);
 
@@ -1178,318 +1304,451 @@ function StockScreen({webAppUrl, onBack}) {
     const items = reorderItems.filter(r=>hasData(r.qty));
     if (!items.length){ showToast("Enter at least one quantity","bg-kaiBurgundy"); return; }
     if (!supplier.trim()){ showToast("Enter a supplier / source","bg-kaiBurgundy"); return; }
+    if (!webAppUrl){ showToast("No Web App URL set","bg-kaiBurgundy"); return; }
     setSubmitting(true);
     try {
       const fd = new FormData();
       fd.append("action","reorder");
-      fd.append("date", reorderDate);
-      fd.append("supplier", supplier);
-      items.forEach(r=>{
-        fd.append("item[]", r.item);
-        fd.append("qty[]", r.qty);
-        fd.append("costPerUnit[]", r.costPerUnit||"0");
-      });
+      fd.append("date",supplier);
+      fd.append("date",reorderDate);
+      fd.append("supplier",supplier);
+      items.forEach(r=>{ fd.append("item[]",r.item); fd.append("qty[]",r.qty); fd.append("costPerUnit[]",r.costPerUnit||"0"); });
       const res  = await fetch(webAppUrl,{method:"POST",body:fd});
       const data = await res.json();
-      if (data.success){
-        showToast("✓ Reorder logged");
-        setSupplier(""); setTab("levels");
-        setReorderItems(STOCK_ITEMS.map(item=>({item,qty:"",costPerUnit:""})));
-        fetchStock();
-      } else showToast("Error: "+data.error,"bg-kaiBurgundy");
+      if (data.success){ showToast("✓ Reorder logged"); setSupplier(""); setTab("levels"); setReorderItems(STOCK_ITEMS.map(item=>({item,qty:"",costPerUnit:""}))); fetchStock(); }
+      else showToast("Error: "+data.error,"bg-kaiBurgundy");
     } catch(e){ showToast("Failed: "+e.message,"bg-kaiBurgundy"); }
-    finally { setSubmitting(false); }
+    finally{ setSubmitting(false); }
   };
 
   const saveEdits = async()=>{
     if (!Object.keys(editLevels).length) return;
+    if (!webAppUrl){ showToast("No Web App URL set","bg-kaiBurgundy"); return; }
     setSubmitting(true);
     try {
-      const fd = new FormData();
-      fd.append("action","updateStock");
+      const fd=new FormData(); fd.append("action","updateStock");
       Object.entries(editLevels).forEach(([item,qty])=>{ fd.append("item[]",item); fd.append("qty[]",qty); });
-      const res  = await fetch(webAppUrl,{method:"POST",body:fd});
-      const data = await res.json();
+      const res=await fetch(webAppUrl,{method:"POST",body:fd});
+      const data=await res.json();
       if (data.success){ showToast("✓ Stock updated"); setEditLevels({}); fetchStock(); }
       else showToast("Error: "+data.error,"bg-kaiBurgundy");
-    } catch(e){ showToast("Failed","bg-kaiBurgundy"); }
-    finally { setSubmitting(false); }
+    } catch{ showToast("Failed","bg-kaiBurgundy"); }
+    finally{ setSubmitting(false); }
   };
 
+  const reorderTotal = reorderItems.reduce((s,r)=>{
+    return s+(parseFloat(r.qty)||0)*(parseFloat(r.costPerUnit)||0);
+  },0);
+
   return (
-    <div className="max-w-xl mx-auto p-4 md:p-8">
+    <div className="min-h-screen flex flex-col">
       {toast && <Toast msg={toast.msg} color={toast.color}/>}
       <Header subtitle="Stock Management" onBack={onBack}/>
-
-      {/* Tabs */}
-      <div className="flex rounded-xl overflow-hidden shadow-sm border border-gray-100 mb-5">
-        {[["levels","Stock Levels"],["reorder","Log Reorder"],["log","History"]].map(([id,label])=>(
-          <button key={id} onClick={()=>setTab(id)}
-            className={`flex-1 py-3 font-semibold text-sm transition-colors ${tab===id?"bg-kaiGreen text-white":"bg-white text-gray-500 hover:bg-gray-50"}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab==="levels" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-kaiGreen/5 px-4 py-3 border-b flex justify-between items-center">
-            <h3 className="font-serif text-kaiGreen text-base font-semibold">Current Stock</h3>
-            <button onClick={fetchStock} className="text-kaiGreen text-xs hover:underline">↻ Refresh</button>
-          </div>
-          {loading ? <p className="p-6 text-center text-gray-400">Loading…</p> : (
-            <>
-              <div className="divide-y divide-gray-50">
-                {STOCK_ITEMS.map(item=>{
-                  const level = stockLevels?.[item];
-                  const editVal = editLevels[item];
-                  const display = editVal!==undefined ? editVal : (level??"-");
-                  const low = typeof level==="number" && level<=2;
-                  return (
-                    <div key={item} className="flex items-center px-4 py-3 gap-3">
-                      <span className="flex-1 text-sm text-gray-700">{item}</span>
-                      {low && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">Low</span>}
-                      <input type="number" className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-sans"
-                        value={display==="-"?"":display} placeholder={display==="-"?"-":undefined}
-                        onChange={e=>setEditLevels(prev=>({...prev,[item]:e.target.value}))}/>
-                    </div>
-                  );
-                })}
-              </div>
-              {Object.keys(editLevels).length>0 && (
-                <div className="p-4 border-t">
-                  <button onClick={saveEdits} disabled={submitting}
-                    className="w-full bg-kaiGreen hover:bg-green-700 text-white py-2.5 rounded-xl font-semibold disabled:opacity-50 transition-colors">
-                    {submitting?"Saving…":"Save Changes"}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {tab==="reorder" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-kaiBurgundy/5 px-4 py-3 border-b">
-            <h3 className="font-serif text-kaiBurgundy text-base font-semibold">Log a Reorder</h3>
-          </div>
-          <div className="p-4 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Date *">
-                <input type="date" className={inp} value={reorderDate} onChange={e=>setReorderDate(e.target.value)}/>
-              </Field>
-              <Field label="Supplier / Source *">
-                <input type="text" placeholder="e.g. Gilmours" className={inp}
-                  value={supplier} onChange={e=>setSupplier(e.target.value)}/>
-              </Field>
-            </div>
-            <div>
-              <div className="grid grid-cols-3 gap-x-2 mb-1 px-1">
-                <span className="col-span-1 text-xs text-gray-400 font-medium">Item</span>
-                <span className="text-xs text-gray-400 font-medium text-right">Qty</span>
-                <span className="text-xs text-gray-400 font-medium text-right">Cost / unit ($)</span>
-              </div>
-              <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
-                {reorderItems.map((r,i)=>(
-                  <div key={r.item} className="grid grid-cols-3 gap-x-2 items-center px-3 py-2">
-                    <span className="text-sm text-gray-700 truncate">{r.item}</span>
-                    <input type="number" placeholder="0" className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-sans"
-                      value={r.qty}
-                      onChange={e=>{ const u=[...reorderItems]; u[i]={...r,qty:e.target.value}; setReorderItems(u); }}/>
-                    <input type="number" step="0.01" placeholder="0.00" className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-right font-sans"
-                      value={r.costPerUnit}
-                      onChange={e=>{ const u=[...reorderItems]; u[i]={...r,costPerUnit:e.target.value}; setReorderItems(u); }}/>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Cost total preview */}
-            {reorderItems.some(r=>hasData(r.qty)&&hasData(r.costPerUnit)) && (
-              <div className="bg-gray-50 rounded-lg px-4 py-2 flex justify-between text-sm">
-                <span className="text-gray-500">Total reorder cost</span>
-                <span className="font-bold text-kaiBurgundy">
-                  {fmt(reorderItems.reduce((s,r)=>{
-                    const qty  = parseFloat(r.qty)||0;
-                    const cost = parseFloat(r.costPerUnit)||0;
-                    return s + qty*cost;
-                  },0))}
-                </span>
-              </div>
-            )}
-            <button onClick={submitReorder} disabled={submitting}
-              className="w-full bg-kaiBurgundy hover:bg-red-800 disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-colors">
-              {submitting?"Saving…":"Submit Reorder"}
+      <div className="flex-1 max-w-2xl w-full mx-auto px-4 pb-8">
+        <div className="flex rounded-xl overflow-hidden shadow-sm border border-gray-100 mb-5">
+          {[["levels","Stock Levels"],["reorder","Log Reorder"],["log","History"]].map(([id,label])=>(
+            <button key={id} onClick={()=>setTab(id)}
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${tab===id?"bg-kaiGreen text-white":"bg-white text-gray-500 hover:bg-gray-50"}`}>
+              {label}
             </button>
-          </div>
-        </div>
-      )}
-
-      {tab==="log" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-kaiBlue/5 px-4 py-3 border-b">
-            <h3 className="font-serif text-kaiBlue text-base font-semibold">Reorder History</h3>
-          </div>
-          {reorderLog.length===0 ? (
-            <p className="p-6 text-center text-sm text-gray-400">No reorders logged yet</p>
-          ) : reorderLog.map((r,i)=>(
-            <div key={i} className="p-4 border-b border-gray-50 last:border-0">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold text-sm text-gray-800">{r.date}</span>
-                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{r.supplier}</span>
-              </div>
-              <div className="space-y-0.5">
-                {r.items?.map((it,j)=>(
-                  <div key={j} className="flex justify-between text-xs text-gray-600">
-                    <span>{it.item}</span>
-                    <span className="font-medium">
-                      ×{it.qty}{it.costPerUnit>0?` @ ${fmt(it.costPerUnit)}`:""}
-                      {it.qty&&it.costPerUnit>0 ? <span className="text-gray-400"> = {fmt(it.qty*it.costPerUnit)}</span> : ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {r.totalCost>0 && (
-                <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between text-xs">
-                  <span className="text-gray-500">Order total</span>
-                  <span className="font-bold text-kaiBurgundy">{fmt(r.totalCost)}</span>
-                </div>
-              )}
-            </div>
           ))}
         </div>
-      )}
+
+        {tab==="levels" && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-kaiGreen/5 px-4 py-3 border-b flex justify-between items-center">
+              <h3 className="font-serif text-kaiGreen text-sm font-semibold">Current Stock</h3>
+              <button onClick={fetchStock} className="text-kaiGreen text-xs hover:underline">↻ Refresh</button>
+            </div>
+            {loading?<p className="p-6 text-center text-gray-400 text-sm">Loading…</p>:(
+              <>
+                <div className="divide-y divide-gray-50">
+                  {STOCK_ITEMS.map(item=>{
+                    const level   = stockLevels?.[item];
+                    const editVal = editLevels[item];
+                    const display = editVal!==undefined?editVal:(level??"-");
+                    const low     = typeof level==="number"&&level<=2;
+                    return (
+                      <div key={item} className="flex items-center px-4 py-3 gap-3">
+                        <span className="flex-1 text-sm text-gray-700">{item}</span>
+                        {low&&<span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">Low</span>}
+                        <input type="number" className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right"
+                          value={display==="-"?"":display} placeholder={display==="-"?"-":undefined}
+                          onChange={e=>setEditLevels(prev=>({...prev,[item]:e.target.value}))}/>
+                      </div>
+                    );
+                  })}
+                </div>
+                {Object.keys(editLevels).length>0&&(
+                  <div className="p-4 border-t">
+                    <Btn onClick={saveEdits} disabled={submitting}
+                      className={`w-full py-2.5 text-sm ${submitting?"bg-gray-200 text-gray-400":"bg-kaiGreen text-white"}`}>
+                      {submitting?"Saving…":"Save Changes"}
+                    </Btn>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {tab==="reorder" && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-kaiBurgundy/5 px-4 py-3 border-b">
+              <h3 className="font-serif text-kaiBurgundy text-sm font-semibold">Log a Reorder</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Date *"><input type="date" className={inp} value={reorderDate} onChange={e=>setReorderDate(e.target.value)}/></Field>
+                <Field label="Supplier / Source *"><input type="text" placeholder="e.g. Gilmours" className={inp} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
+              </div>
+              <div>
+                <div className="grid grid-cols-3 gap-x-2 mb-1.5 px-1">
+                  <span className="col-span-1 text-xs text-gray-400 font-medium">Item</span>
+                  <span className="text-xs text-gray-400 font-medium text-right">Qty</span>
+                  <span className="text-xs text-gray-400 font-medium text-right">$/unit</span>
+                </div>
+                <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
+                  {reorderItems.map((r,i)=>(
+                    <div key={r.item} className="grid grid-cols-3 gap-x-2 items-center px-3 py-2">
+                      <span className="text-sm text-gray-700 truncate">{r.item}</span>
+                      <input type="number" placeholder="0" className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-right"
+                        value={r.qty} onChange={e=>{ const u=[...reorderItems]; u[i]={...r,qty:e.target.value}; setReorderItems(u); }}/>
+                      <input type="number" step="0.01" placeholder="0.00" className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-right"
+                        value={r.costPerUnit} onChange={e=>{ const u=[...reorderItems]; u[i]={...r,costPerUnit:e.target.value}; setReorderItems(u); }}/>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {reorderItems.some(r=>hasData(r.qty)&&hasData(r.costPerUnit))&&(
+                <div className="bg-gray-50 rounded-xl px-4 py-2.5 flex justify-between text-sm">
+                  <span className="text-gray-500">Total reorder cost</span>
+                  <span className="font-bold text-kaiBurgundy">{fmt(reorderTotal)}</span>
+                </div>
+              )}
+              <Btn onClick={submitReorder} disabled={submitting}
+                className={`w-full py-3 text-sm ${submitting?"bg-gray-200 text-gray-400":"bg-kaiBurgundy text-white"}`}>
+                {submitting?"Saving…":"Submit Reorder"}
+              </Btn>
+            </div>
+          </div>
+        )}
+
+        {tab==="log" && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-kaiBlue/5 px-4 py-3 border-b">
+              <h3 className="font-serif text-kaiBlue text-sm font-semibold">Reorder History</h3>
+            </div>
+            {reorderLog.length===0
+              ?<p className="p-6 text-center text-sm text-gray-400">No reorders logged yet</p>
+              :reorderLog.map((r,i)=>(
+                <div key={i} className="p-4 border-b border-gray-50 last:border-0">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-semibold text-sm">{r.date}</span>
+                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{r.supplier}</span>
+                  </div>
+                  {r.items?.map((it,j)=>(
+                    <div key={j} className="flex justify-between text-xs text-gray-600 py-0.5">
+                      <span>{it.item}</span>
+                      <span className="font-medium">
+                        ×{it.qty}{it.costPerUnit>0?` @ ${fmt(it.costPerUnit)}`:""}
+                        {it.qty&&it.costPerUnit>0?<span className="text-gray-400"> = {fmt(it.qty*it.costPerUnit)}</span>:""}
+                      </span>
+                    </div>
+                  ))}
+                  {r.totalCost>0&&(
+                    <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between text-xs">
+                      <span className="text-gray-500">Order total</span>
+                      <span className="font-bold text-kaiBurgundy">{fmt(r.totalCost)}</span>
+                    </div>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 // DASHBOARD SCREEN
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 function DashboardScreen({webAppUrl, onBack}) {
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [toast,   setToast]   = useState(null);
+  const [rawData,    setRawData]    = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [toast,      setToast]      = useState(null);
+  const [dateFrom,   setDateFrom]   = useState("");
+  const [dateTo,     setDateTo]     = useState("");
+  const [quickRange, setQuickRange] = useState("30d");
+  const [detail,     setDetail]     = useState(null); // event detail modal
+
+  const showToast=(msg,color="bg-kaiBurgundy")=>{ setToast({msg,color}); setTimeout(()=>setToast(null),3000); };
 
   useEffect(()=>{
     if (!webAppUrl){ setLoading(false); return; }
     fetch(`${webAppUrl}?action=dashboard`)
       .then(r=>r.json())
-      .then(d=>{ if(d.success)setData(d); else setToast({msg:"Error: "+d.error,color:"bg-kaiBurgundy"}); })
-      .catch(()=>setToast({msg:"Failed to connect",color:"bg-kaiBurgundy"}))
+      .then(d=>{ if(d.success)setRawData(d); else showToast("Error: "+d.error); })
+      .catch(()=>showToast("Failed to connect"))
       .finally(()=>setLoading(false));
   },[webAppUrl]);
 
-  const stat=(label,value,color="text-kaiBurgundy")=>(
+  // Apply quick range to date fields
+  useEffect(()=>{
+    const now = new Date();
+    const to  = now.toISOString().slice(0,10);
+    const from = new Date(now);
+    if (quickRange==="7d")   from.setDate(from.getDate()-7);
+    if (quickRange==="30d")  from.setDate(from.getDate()-30);
+    if (quickRange==="90d")  from.setDate(from.getDate()-90);
+    if (quickRange==="all")  { setDateFrom(""); setDateTo(""); return; }
+    setDateFrom(from.toISOString().slice(0,10));
+    setDateTo(to);
+  },[quickRange]);
+
+  // Filter events by date range
+  const data = useMemo(()=>{
+    if (!rawData) return null;
+    let events = rawData.allEvents||[];
+    if (dateFrom) events = events.filter(e=>e.date>=dateFrom);
+    if (dateTo)   events = events.filter(e=>e.date<=dateTo);
+
+    const totalRevenue = events.reduce((s,e)=>s+(parseFloat(e.totalSales)||0),0);
+    const totalStaffCost = events.reduce((s,e)=>s+(parseFloat(e.staffCost)||0),0);
+    const totalStockCost = events.reduce((s,e)=>s+(parseFloat(e.stockCost)||0),0);
+    const totalCost = totalStaffCost + totalStockCost;
+    const profit = totalRevenue - totalCost;
+
+    // Top products from filtered events
+    const prodMap = {};
+    events.forEach(e=>{ (e.sales||[]).forEach(s=>{ prodMap[s.product]=(prodMap[s.product]||0)+(parseFloat(s.qty)||0); }); });
+    const topProducts = Object.entries(prodMap).map(([product,qty])=>({product,qty})).sort((a,b)=>b.qty-a.qty).slice(0,8);
+
+    return { ...rawData, filteredEvents: events, totalRevenue, totalStaffCost, totalStockCost, totalCost, profit, topProducts, totalEvents: events.length };
+  },[rawData, dateFrom, dateTo]);
+
+  const StatCard = ({label,value,sub,color="text-kaiBurgundy"})=>(
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-      <div className={`text-2xl font-serif font-bold ${color}`}>{value??"-"}</div>
+      <div className={`text-xl font-serif font-bold ${color}`}>{value??"-"}</div>
+      {sub&&<div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
       <div className="text-xs text-gray-400 mt-1">{label}</div>
     </div>
   );
 
   return (
-    <div className="max-w-xl mx-auto p-4 md:p-8">
-      {toast && <Toast msg={toast.msg} color={toast.color}/>}
+    <div className="min-h-screen flex flex-col">
+      {toast&&<Toast msg={toast.msg} color={toast.color}/>}
       <Header subtitle="Dashboard" onBack={onBack}/>
-      {loading ? (
-        <div className="text-center py-16 text-gray-400">Loading…</div>
-      ) : !data ? (
-        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400 text-sm">Submit your first report to see stats</div>
-      ) : (
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            {stat("Total Events",    data.totalEvents,                        "text-kaiBurgundy")}
-            {stat("Total Revenue",   data.totalRevenue?`$${data.totalRevenue}`:"-", "text-kaiGreen")}
-            {stat("LegaSea Signups", data.totalSignups,                       "text-kaiBlue")}
-            {stat("Avg / Event",     data.avgRevenue?`$${data.avgRevenue}`:"-","text-coffeeBrown")}
+      <div className="flex-1 max-w-2xl w-full mx-auto px-4 pb-8 space-y-5">
+
+        {/* Date filter */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+          <div className="flex gap-1.5 flex-wrap">
+            {[["7d","7 days"],["30d","30 days"],["90d","90 days"],["all","All time"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setQuickRange(id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${quickRange===id?"bg-kaiBlue text-white":"bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                {label}
+              </button>
+            ))}
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="From"><input type="date" className={inp} value={dateFrom} onChange={e=>{setDateFrom(e.target.value);setQuickRange("");}}/></Field>
+            <Field label="To">  <input type="date" className={inp} value={dateTo}   onChange={e=>{setDateTo(e.target.value);setQuickRange("");}}/></Field>
+          </div>
+        </div>
 
-          {data.recentEvents?.length>0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-kaiBurgundy/5 px-4 py-3 border-b">
-                <h3 className="font-serif text-kaiBurgundy text-base font-semibold">Recent Events</h3>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {data.recentEvents.map((ev,i)=>(
-                  <div key={i} className="px-4 py-3 flex justify-between items-center">
-                    <div>
-                      <div className="font-semibold text-sm text-gray-800">{ev.eventName}</div>
-                      <div className="text-xs text-gray-400">{ev.date}{ev.location?` · ${ev.location}`:""}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-kaiGreen">{ev.totalSales?`$${ev.totalSales}`:"-"}</div>
-                      <div className="text-xs text-gray-400">{ev.signups} signups</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {loading ? (
+          <div className="text-center py-16 text-gray-400">Loading…</div>
+        ) : !data ? (
+          <div className="bg-white rounded-xl p-8 text-center text-sm text-gray-400">Submit your first report to see stats</div>
+        ) : (
+          <>
+            {/* Key stats */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Events"       value={data.totalEvents}                             color="text-kaiBurgundy"/>
+              <StatCard label="Revenue"      value={data.totalRevenue?fmt(data.totalRevenue):"-"} color="text-kaiGreen"/>
+              <StatCard label="Staff Cost"   value={data.totalStaffCost?fmt(data.totalStaffCost):"-"} sub="@ $30/hr" color="text-kaiBlue"/>
+              <StatCard label="Stock Cost"   value={data.totalStockCost?fmt(data.totalStockCost):"-"} color="text-coffeeBrown"/>
             </div>
-          )}
 
-          {data.topProducts?.length>0 && (
+            {/* P&L summary */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="bg-kaiGreen/5 px-4 py-3 border-b">
-                <h3 className="font-serif text-kaiGreen text-base font-semibold">Top Sellers</h3>
+                <h3 className="font-serif text-kaiGreen text-sm font-semibold">P&L Summary</h3>
               </div>
-              <div className="divide-y divide-gray-50">
-                {data.topProducts.map((p,i)=>(
-                  <div key={i} className="px-4 py-2.5 flex justify-between items-center">
-                    <span className="text-sm text-gray-700">{i+1}. {p.product}</span>
-                    <span className="text-sm font-bold">{p.qty} sold</span>
+              <div className="p-4 space-y-2">
+                {[
+                  ["Revenue",    fmt(data.totalRevenue||0),    "text-kaiGreen"],
+                  ["Staff Cost", `− ${fmt(data.totalStaffCost||0)}`, "text-gray-600"],
+                  ["Stock Cost", `− ${fmt(data.totalStockCost||0)}`, "text-gray-600"],
+                ].map(([label,val,cls])=>(
+                  <div key={label} className="flex justify-between text-sm">
+                    <span className="text-gray-600">{label}</span>
+                    <span className={`font-semibold ${cls}`}>{val}</span>
+                  </div>
+                ))}
+                <div className="border-t border-gray-200 pt-2 flex justify-between">
+                  <span className="font-semibold text-sm">Estimated Profit</span>
+                  <span className={`font-bold text-sm ${(data.profit||0)>=0?"text-kaiGreen":"text-red-500"}`}>
+                    {(data.profit||0)>=0?"":""}{fmt(data.profit||0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent events */}
+            {data.filteredEvents?.length>0&&(
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-kaiBurgundy/5 px-4 py-3 border-b">
+                  <h3 className="font-serif text-kaiBurgundy text-sm font-semibold">Events</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {[...data.filteredEvents].sort((a,b)=>b.date.localeCompare(a.date)).map((ev,i)=>(
+                    <button key={i} onClick={()=>setDetail(ev)}
+                      className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50 transition-colors text-left">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm text-gray-800 truncate">{ev.eventName}</div>
+                        <div className="text-xs text-gray-400">{ev.date}{ev.location?` · ${ev.location}`:""}</div>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <div className="text-sm font-bold text-kaiGreen">{ev.totalSales?fmt(ev.totalSales):"-"}</div>
+                        <div className="text-xs text-gray-400">
+                          {ev.staffCost||ev.stockCost?`cost ${fmt((ev.staffCost||0)+(ev.stockCost||0))}`:""}
+                        </div>
+                      </div>
+                      <svg className="h-4 w-4 text-gray-300 ml-2 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top sellers */}
+            {data.topProducts?.length>0&&(
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-kaiGreen/5 px-4 py-3 border-b">
+                  <h3 className="font-serif text-kaiGreen text-sm font-semibold">Top Sellers</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {data.topProducts.map((p,i)=>(
+                    <div key={i} className="px-4 py-2.5 flex justify-between items-center">
+                      <span className="text-sm text-gray-700">{i+1}. {p.product}</span>
+                      <span className="text-sm font-bold">{p.qty} sold</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Event Detail Modal */}
+      {detail&&(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-kaiYellow w-full max-w-xl rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh] p-5 relative">
+            <button onClick={()=>setDetail(null)} className="absolute top-4 right-4 text-kaiBurgundy text-xl font-bold">✕</button>
+            <h2 className="text-xl font-serif font-bold text-kaiBurgundy mb-1">{detail.eventName}</h2>
+            <p className="text-sm text-gray-500 mb-4">{detail.date}{detail.location?` · ${detail.location}`:""}</p>
+
+            {/* P&L for this event */}
+            <div className="bg-white rounded-xl p-4 mb-4 space-y-2">
+              <h3 className="font-semibold text-sm text-gray-700 mb-2">Revenue & Costs</h3>
+              {[
+                ["Revenue",    fmt(detail.totalSales||0), "text-kaiGreen"],
+                ["Staff Cost", `− ${fmt(detail.staffCost||0)}`, "text-gray-600"],
+                ["Stock Cost", `− ${fmt(detail.stockCost||0)}`, "text-gray-600"],
+              ].map(([l,v,c])=>(
+                <div key={l} className="flex justify-between text-sm"><span className="text-gray-500">{l}</span><span className={`font-semibold ${c}`}>{v}</span></div>
+              ))}
+              <div className="border-t pt-2 flex justify-between">
+                <span className="font-semibold text-sm">Est. Profit</span>
+                <span className={`font-bold text-sm ${((detail.totalSales||0)-(detail.staffCost||0)-(detail.stockCost||0))>=0?"text-kaiGreen":"text-red-500"}`}>
+                  {fmt((detail.totalSales||0)-(detail.staffCost||0)-(detail.stockCost||0))}
+                </span>
+              </div>
+            </div>
+
+            {detail.staff?.length>0&&(
+              <div className="bg-white rounded-xl p-4 mb-3">
+                <h3 className="font-semibold text-sm text-gray-700 mb-2">Staff</h3>
+                {detail.staff.map((s,i)=>(
+                  <div key={i} className="flex justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                    <span>{s.name}</span>
+                    <span className="text-gray-500">{s.start}–{s.end} ({s.hours}h)</span>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {data.stockLevels && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-kaiBlue/5 px-4 py-3 border-b">
-                <h3 className="font-serif text-kaiBlue text-base font-semibold">Stock Levels</h3>
+            {detail.sales?.length>0&&(
+              <div className="bg-white rounded-xl p-4 mb-3">
+                <h3 className="font-semibold text-sm text-gray-700 mb-2">Sales</h3>
+                {detail.sales.map((s,i)=>(
+                  <div key={i} className="flex justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                    <span>{s.product}</span><span className="font-medium">{s.qty}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-1 space-y-1">
+                  <div className="flex justify-between text-xs"><span className="text-gray-500">Cash</span><span>${detail.cashSales||"0"}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-gray-500">Eftpos</span><span>${detail.eftposSales||"0"}</span></div>
+                  <div className="flex justify-between text-sm font-bold"><span>Total</span><span className="text-kaiGreen">{fmt(detail.totalSales)}</span></div>
+                </div>
               </div>
-              <div className="divide-y divide-gray-50">
-                {STOCK_ITEMS.map(item=>{
-                  const level=data.stockLevels[item];
-                  const low=typeof level==="number"&&level<=2;
-                  return (
-                    <div key={item} className="flex items-center px-4 py-2.5 gap-2">
-                      <span className="flex-1 text-sm text-gray-700">{item}</span>
-                      {low && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">Low</span>}
-                      <span className={`text-sm font-bold ${low?"text-red-500":"text-gray-700"}`}>{level??"-"}</span>
-                    </div>
-                  );
-                })}
+            )}
+
+            {detail.stockUsed?.length>0&&(
+              <div className="bg-white rounded-xl p-4 mb-3">
+                <h3 className="font-semibold text-sm text-gray-700 mb-2">Stock Used</h3>
+                {detail.stockUsed.map((s,i)=>(
+                  <div key={i} className="flex justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                    <span>{s.item}</span><span className="font-medium">{s.qty}</span>
+                  </div>
+                ))}
               </div>
-            </div>
-          )}
+            )}
+
+            {(detail.notes||detail.equipmentIssues)&&(
+              <div className="bg-white rounded-xl p-4">
+                <h3 className="font-semibold text-sm text-gray-700 mb-2">Notes</h3>
+                {detail.equipmentIssues&&<p className="text-xs text-gray-600 mb-1"><span className="font-medium">Issues:</span> {detail.equipmentIssues}</p>}
+                {detail.notes&&<p className="text-xs text-gray-600"><span className="font-medium">General:</span> {detail.notes}</p>}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 // ROOT APP
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
 function App() {
-  const [webAppUrl,  setWebAppUrl]  = useState(localStorage.getItem(WEB_APP_KEY)||"");
-  const [configured, setConfigured] = useState(!!localStorage.getItem(WEB_APP_KEY));
+  const [webAppUrl,  setWebAppUrl]  = useState(()=>localStorage.getItem(WEB_APP_KEY)||"");
+  const [configured, setConfigured] = useState(()=>!!localStorage.getItem(WEB_APP_KEY));
   const [screen,     setScreen]     = useState("home");
-  const hasActiveEvent = !!loadEvent();
 
-  const saveUrl = url => {
-    localStorage.setItem(WEB_APP_KEY, url);
-    setWebAppUrl(url);
-    setConfigured(true);
-  };
+  const saveUrl = url => { localStorage.setItem(WEB_APP_KEY,url); setWebAppUrl(url); setConfigured(true); };
+
+  const hasActiveEvent = !!loadEvent();
 
   if (!configured) return <SetupScreen onSave={saveUrl}/>;
 
-  if (screen==="event")     return <EventScreen     webAppUrl={webAppUrl} onBack={()=>setScreen("home")}/>;
-  if (screen==="stock")     return <StockScreen     webAppUrl={webAppUrl} onBack={()=>setScreen("home")}/>;
-  if (screen==="dashboard") return <DashboardScreen webAppUrl={webAppUrl} onBack={()=>setScreen("home")}/>;
-
-  return <HomeScreen onNav={setScreen} onSettings={()=>setConfigured(false)} hasActiveEvent={hasActiveEvent}/>;
+  return (
+    <>
+      <OnlineStatus/>
+      {screen==="event"     && <EventScreen     webAppUrl={webAppUrl} onBack={()=>setScreen("home")}/>}
+      {screen==="stock"     && <StockScreen     webAppUrl={webAppUrl} onBack={()=>setScreen("home")}/>}
+      {screen==="dashboard" && <DashboardScreen webAppUrl={webAppUrl} onBack={()=>setScreen("home")}/>}
+      {screen==="home"      && <HomeScreen onNav={setScreen} onSettings={()=>setConfigured(false)} hasActiveEvent={hasActiveEvent}/>}
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
