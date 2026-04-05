@@ -1,5 +1,5 @@
 // =====================================================================
-// COFFEE CART — Google Apps Script Backend v5
+// COFFEE CART — Google Apps Script Backend v6
 // =====================================================================
 // SHEET TABS REQUIRED: SalesReports | StockLevels | ReorderLog
 // SCRIPT PROPERTIES:   SHEET_ID = your Google Sheet ID
@@ -265,12 +265,19 @@ function handleDashboard(){
 
   const eventMap={};
 
+  const tz=Session.getScriptTimeZone();
+
   for(let i=1;i<rows.length;i++){
     const r     = rows[i];
-    const date  = String(r[I.date]).slice(0,10);
+    // Date cells may be stored as Date objects or strings depending on sheet format.
+    // Utilities.formatDate handles both safely; fall back to string slice for plain strings.
+    const rawDate=r[I.date];
+    const date  = rawDate instanceof Date
+      ? Utilities.formatDate(rawDate,tz,'yyyy-MM-dd')
+      : String(rawDate).slice(0,10);
     const ename = String(r[I.event]);
     const type  = String(r[I.type]);
-    if(!date||!ename) continue;  // skip malformed rows
+    if(!date||date.length<8||!ename) continue;  // skip malformed or header rows
 
     const key=`${date}||${ename}`;
     if(!eventMap[key]){
