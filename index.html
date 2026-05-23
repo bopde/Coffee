@@ -74,8 +74,9 @@ const STAFF = ["Ben","Matt","Xavier","Connor","Volunteer"];
 // Canonical stock item names — Title Case, Rg/Lg for cup sizes
 const STOCK_ITEMS = [
   "Cup - Lg","Cup - Rg","Milk - Cow 2L","Milk - Oat 1L",
-  "Beans - 1kg","Chocolate Powder - Bag","Chocolate Sauce - 500ml Bottle",
-  "Tea - Box","Iced Coffee - Can","Coke","Sprite","Coke Zero","L&P"
+  "Beans - 1kg","Chocolate Powder - Bag",
+  "Tea - Box","Iced Coffee - Can","Coke","Sprite","Coke Zero","L&P",
+  "Sugar - Bag","Sweetener - Sachet","Takeaway Trays"
 ];
 
 // Menu items — single source of truth for POS
@@ -83,25 +84,24 @@ const STOCK_ITEMS = [
 // cup     → 'lg' | 'rg' | null  (matches STOCK_ITEMS above)
 // milkMl  → cow milk per drink (ml); oat replaces this when alt is toggled
 // beansG  → espresso beans per drink (g)
-// chocMl  → chocolate sauce per drink (ml)
 // sk      → direct stock item key for cans/bottles (must match STOCK_ITEMS exactly)
 // custom  → user enters price at time of sale
 const MENU = [
-  {id:"wc_rg", label:"White Coffee", size:"Rg", price:6, canAlt:true,  cup:"rg", milkMl:300, beansG:19, chocMl:0,  cat:"hot"},
-  {id:"wc_lg", label:"White Coffee", size:"Lg", price:7, canAlt:true,  cup:"lg", milkMl:300, beansG:19, chocMl:0,  cat:"hot"},
-  {id:"bc_rg", label:"Black Coffee", size:"Rg", price:5, canAlt:false, cup:"rg", milkMl:0,   beansG:19, chocMl:0,  cat:"hot"},
-  {id:"bc_lg", label:"Black Coffee", size:"Lg", price:5, canAlt:false, cup:"lg", milkMl:0,   beansG:19, chocMl:0,  cat:"hot"},
-  {id:"hc_rg", label:"Hot Choc",     size:"Rg", price:6, canAlt:true,  cup:"rg", milkMl:300, beansG:0,  chocMl:50, cat:"hot"},
-  {id:"hc_lg", label:"Hot Choc",     size:"Lg", price:7, canAlt:true,  cup:"lg", milkMl:300, beansG:0,  chocMl:50, cat:"hot"},
-  {id:"tea_rg",label:"Tea",          size:"Rg", price:5, canAlt:false, cup:"rg", milkMl:0,   beansG:0,  chocMl:0,  cat:"hot"},
-  {id:"tea_lg",label:"Tea",          size:"Lg", price:5, canAlt:false, cup:"lg", milkMl:0,   beansG:0,  chocMl:0,  cat:"hot"},
-  {id:"ic",    label:"Iced Coffee",  size:"",   price:5, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Iced Coffee - Can"},
-  {id:"coke",  label:"Coke",         size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Coke"},
-  {id:"sprite",label:"Sprite",       size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Sprite"},
-  {id:"czero", label:"Coke Zero",    size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"Coke Zero"},
-  {id:"lp",    label:"L&P",          size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"cold", sk:"L&P"},
-  {id:"other", label:"Coffee - Other",size:"",  price:0, canAlt:false, cup:"rg", milkMl:0,   beansG:19, chocMl:0,  cat:"other", custom:true},
-  {id:"donate",label:"Donation",     size:"",   price:0, canAlt:false, cup:null, milkMl:0,   beansG:0,  chocMl:0,  cat:"other", custom:true},
+  {id:"wc_rg", label:"White Coffee", size:"Rg", price:6, canAlt:true,  cup:"rg", milkMl:300, beansG:19, cat:"hot"},
+  {id:"wc_lg", label:"White Coffee", size:"Lg", price:7, canAlt:true,  cup:"lg", milkMl:300, beansG:19, cat:"hot"},
+  {id:"bc_rg", label:"Black Coffee", size:"Rg", price:5, canAlt:false, cup:"rg", milkMl:0,   beansG:19, cat:"hot"},
+  {id:"bc_lg", label:"Black Coffee", size:"Lg", price:5, canAlt:false, cup:"lg", milkMl:0,   beansG:19, cat:"hot"},
+  {id:"hc_rg", label:"Hot Choc",     size:"Rg", price:6, canAlt:true,  cup:"rg", milkMl:300, beansG:0,  cat:"hot"},
+  {id:"hc_lg", label:"Hot Choc",     size:"Lg", price:7, canAlt:true,  cup:"lg", milkMl:300, beansG:0,  cat:"hot"},
+  {id:"tea_rg",label:"Tea",          size:"Rg", price:5, canAlt:false, cup:"rg", milkMl:0,   beansG:0,  cat:"hot"},
+  {id:"tea_lg",label:"Tea",          size:"Lg", price:5, canAlt:false, cup:"lg", milkMl:0,   beansG:0,  cat:"hot"},
+  {id:"ic",    label:"Iced Coffee",  size:"",   price:5, canAlt:false, cup:null, milkMl:0,   beansG:0,  cat:"cold", sk:"Iced Coffee - Can"},
+  {id:"coke",  label:"Coke",         size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  cat:"cold", sk:"Coke"},
+  {id:"sprite",label:"Sprite",       size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  cat:"cold", sk:"Sprite"},
+  {id:"czero", label:"Coke Zero",    size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  cat:"cold", sk:"Coke Zero"},
+  {id:"lp",    label:"L&P",          size:"",   price:3, canAlt:false, cup:null, milkMl:0,   beansG:0,  cat:"cold", sk:"L&P"},
+  {id:"other", label:"Coffee - Other",size:"",  price:0, canAlt:false, cup:"rg", milkMl:0,   beansG:19, cat:"other", custom:true},
+  {id:"donate",label:"Donation",     size:"",   price:0, canAlt:false, cup:null, milkMl:0,   beansG:0,  cat:"other", custom:true},
 ];
 const CAT_ORDER = ["hot","cold","other"];
 const CAT_LABEL = {hot:"Hot", cold:"Cold", other:"Other"};
@@ -145,7 +145,7 @@ function blankEv(){
     cashSales:"", eftposSales:"",
     // Stock section: independently editable
     stockLocked:false, stockOverride:null,
-    fridgeReadings:[], issues:"", notes:""
+    fridgeReadings:[], signups:"", issues:"", notes:""
   };
 }
 
@@ -165,7 +165,7 @@ function salesFromOrders(orders){
 // ── Derive stock used from sales quantity map ─────────
 // All continuous values at 1dp; counts as whole numbers.
 function stockFromSales(sq){
-  let cowMl=0, oatMl=0, beansG=0, chocMl=0, cupsLg=0, cupsRg=0;
+  let cowMl=0, oatMl=0, beansG=0, cupsLg=0, cupsRg=0;
   const cans={};
 
   // Proportional oat milk allocation across milk drinks
@@ -181,7 +181,6 @@ function stockFromSales(sq){
     const def = mid ? MENU.find(m=>m.id===mid) : null;
     if(!def) return;
     beansG += def.beansG * qty;
-    chocMl += def.chocMl * qty;
     if(def.cup==="lg") cupsLg+=qty;
     if(def.cup==="rg") cupsRg+=qty;
     if(def.milkMl>0 && totalMilkDrinks>0){
@@ -198,7 +197,6 @@ function stockFromSales(sq){
   if(cowMl>0)  u["Milk - Cow 2L"]=r1(cowMl/1000);
   if(oatMl>0)  u["Milk - Oat 1L"]=r1(oatMl/1000);
   if(beansG>0) u["Beans - 1kg"]=r1(beansG/1000);
-  if(chocMl>0) u["Chocolate Sauce - 500ml Bottle"]=r1(chocMl/500);
   Object.entries(cans).forEach(([k,v])=>{ if(v>0) u[k]=v; });
   return u;
 }
@@ -256,10 +254,11 @@ function buildSummary(ev){
     s+=`\n--- Fridge ---\n`;
     ev.fridgeReadings.forEach(r=>{ s+=`${r.time}: ${r.temp}°C\n`; });
   }
-  if(hasV(ev.issues)||hasV(ev.notes)){
+  if(hasV(ev.signups)||hasV(ev.issues)||hasV(ev.notes)){
     s+=`\n--- Notes ---\n`;
-    if(hasV(ev.issues)) s+=`Issues: ${ev.issues}\n`;
-    if(hasV(ev.notes))  s+=`Notes: ${ev.notes}\n`;
+    if(hasV(ev.signups)) s+=`LegaSea Signups: ${ev.signups}\n`;
+    if(hasV(ev.issues))  s+=`Issues: ${ev.issues}\n`;
+    if(hasV(ev.notes))   s+=`Notes: ${ev.notes}\n`;
   }
   return s;
 }
@@ -687,8 +686,9 @@ function POS({event,onUpdate,onBack}){
 // ═══════════════════════════════════════════════════════
 // ORDER HISTORY (collapsible, used in EventScreen)
 // ═══════════════════════════════════════════════════════
-function OrderHistory({orders}){
+function OrderHistory({orders,onDelete}){
   const[exp,setExp]=useState(null);
+  const[confirmDel,setConfirmDel]=useState(null);
   if(!orders?.length) return null;
   return(
     <div className="space-y-1.5">
@@ -724,6 +724,16 @@ function OrderHistory({orders}){
                   </div>
                 );
               })}
+              {onDelete&&(
+                confirmDel===o.id ? (
+                  <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                    <Btn onClick={()=>setConfirmDel(null)} className="flex-1 border border-gray-200 text-gray-500 py-1.5 rounded-lg text-xs font-semibold">Cancel</Btn>
+                    <Btn onClick={()=>{ onDelete(o.id); setExp(null); setConfirmDel(null); }} className="flex-1 bg-red-500 text-white py-1.5 rounded-lg text-xs font-semibold">Remove</Btn>
+                  </div>
+                ) : (
+                  <Btn onClick={()=>setConfirmDel(o.id)} className="mt-2 text-xs text-red-400 hover:text-red-600 pt-2 border-t border-gray-100 w-full text-left">Remove order</Btn>
+                )
+              )}
             </div>
           )}
         </div>
@@ -783,11 +793,8 @@ function EventScreen({webAppUrl,onBack}){
   const resetStock = () => setEv(p=>({...p, stockLocked:false, stockOverride:null}));
 
   // ── Clear and go home ────────────────────────────────
-  const doClear = () => {
-    if(window.confirm("Clear all event data and return home?")){
-      lsDel(EV_KEY); onBack();
-    }
-  };
+  const[confirmClear,setConfirmClear] = useState(false);
+  const doClear = () => { lsDel(EV_KEY); onBack(); };
 
   // ── Submit report ─────────────────────────────────────
   const doSubmit = async () => {
@@ -826,6 +833,7 @@ function EventScreen({webAppUrl,onBack}){
       (ev.fridgeReadings||[]).forEach(r=>{
         fd.append("fridgeTime[]",r.time); fd.append("fridgeTemp[]",r.temp);
       });
+      fd.append("legaseaSignups",ev.signups||"");
       fd.append("issues",ev.issues||"");
       fd.append("notes", ev.notes||"");
 
@@ -887,7 +895,8 @@ function EventScreen({webAppUrl,onBack}){
         {/* Order history */}
         {(ev.orders||[]).length>0&&(
           <Card title={`Orders (${(ev.orders||[]).length})`} accent="brown">
-            <OrderHistory orders={ev.orders||[]}/>
+            <OrderHistory orders={ev.orders||[]}
+              onDelete={id=>upd("orders",(ev.orders||[]).filter(o=>o.id!==id))}/>
           </Card>
         )}
 
@@ -1076,6 +1085,10 @@ function EventScreen({webAppUrl,onBack}){
         {/* Notes */}
         <Card title="Notes">
           <div className="space-y-3">
+            <Fld label="LegaSea Signups">
+              <input type="number" min="0" step="1" placeholder="0" className={INP}
+                value={ev.signups||""} onChange={e=>upd("signups",e.target.value)}/>
+            </Fld>
             <Fld label="Issues (equipment, water, power, etc.)">
               <textarea className={`${INP} h-20 resize-none`}
                 placeholder="e.g. No issues / Water pump slow / Power outage at 2pm"
@@ -1092,9 +1105,16 @@ function EventScreen({webAppUrl,onBack}){
         <Btn onClick={()=>setShowSum(true)} className="w-full bg-kaiGreen hover:bg-green-700 text-white py-4 rounded-2xl text-base font-serif font-bold shadow">
           Review & Submit
         </Btn>
-        <Btn onClick={doClear} className="w-full text-gray-400 hover:text-red-400 py-2 text-xs">
-          Clear event &amp; return home
-        </Btn>
+        {confirmClear ? (
+          <div className="flex gap-2">
+            <Btn onClick={()=>setConfirmClear(false)} className="flex-1 border border-gray-200 text-gray-500 py-2 rounded-xl text-xs font-semibold">Cancel</Btn>
+            <Btn onClick={doClear} className="flex-1 bg-red-500 text-white py-2 rounded-xl text-xs font-semibold">Yes, clear everything</Btn>
+          </div>
+        ) : (
+          <Btn onClick={()=>setConfirmClear(true)} className="w-full text-gray-400 hover:text-red-400 py-2 text-xs">
+            Clear event &amp; return home
+          </Btn>
+        )}
       </div>
 
       {/* Summary modal */}
@@ -1136,6 +1156,22 @@ function StockScreen({webAppUrl,onBack}){
   const[rDate,setRDate]     = useState(toDay());
   const[supplier,setSupplier] = useState("");
   const[rItems,setRItems]   = useState(STOCK_ITEMS.map(i=>({item:i,qty:"",cpu:""})));
+
+  // Build last-price map from reorder log (first entry per item = most recent)
+  const lastPrices = useMemo(()=>{
+    const map={};
+    log.forEach(entry=>{
+      entry.items?.forEach(it=>{
+        if(!(it.item in map)&&it.costPerUnit>0) map[it.item]=String(it.costPerUnit);
+      });
+    });
+    return map;
+  },[log]);
+
+  // Pre-fill $/unit from last reorder whenever the log loads
+  useEffect(()=>{
+    setRItems(prev=>prev.map(r=>({...r, cpu:r.cpu||lastPrices[r.item]||""})));
+  },[lastPrices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchStock(){
     if(!webAppUrl) return;
@@ -1185,7 +1221,7 @@ function StockScreen({webAppUrl,onBack}){
       if(d.success){
         showToast("✓ Reorder logged");
         setSupplier(""); setTab("levels");
-        setRItems(STOCK_ITEMS.map(i=>({item:i,qty:"",cpu:""})));
+        setRItems(STOCK_ITEMS.map(i=>({item:i,qty:"",cpu:lastPrices[i]||""})));
         fetchStock();
       } else showToast("Error: "+d.error,"bg-kaiBurgundy");
     }catch{ showToast("Failed","bg-kaiBurgundy"); }
@@ -1393,6 +1429,7 @@ function DashScreen({webAppUrl,onBack}){
     const pm={};
     evs.forEach(ev=>(ev.sales||[]).forEach(s=>{ pm[s.product]=(pm[s.product]||0)+(parseFloat(s.qty)||0); }));
     const topProducts = Object.entries(pm).map(([product,qty])=>({product,qty})).sort((a,b)=>b.qty-a.qty).slice(0,8);
+    const totalSignups = evs.reduce((s,ev)=>s+(parseInt(ev.signups)||0), 0);
     return {
       evs,
       totalEvents:  evs.length,
@@ -1400,6 +1437,7 @@ function DashScreen({webAppUrl,onBack}){
       totalStaffCost: staffCost.toFixed(2),
       totalStockCost: stockCost.toFixed(2),
       estimatedProfit: profit.toFixed(2),
+      totalSignups,
       topProducts,
     };
   },[rawData,range,cFrom,cTo]);
@@ -1453,10 +1491,11 @@ function DashScreen({webAppUrl,onBack}){
             : <>
                 {/* Key stats */}
                 <div className="grid grid-cols-2 gap-3">
-                  <StatBox label="Events"     val={data.totalEvents}                 color="text-kaiBurgundy"/>
-                  <StatBox label="Revenue"    val={"$"+data.totalRevenue}            color="text-kaiGreen"/>
-                  <StatBox label="Staff Cost" val={"$"+data.totalStaffCost}          color="text-kaiBlue" sub="@ $30/hr"/>
-                  <StatBox label="Stock Cost" val={"$"+data.totalStockCost}          color="text-coffeeBrown" sub="most recent prices"/>
+                  <StatBox label="Events"          val={data.totalEvents}            color="text-kaiBurgundy"/>
+                  <StatBox label="Revenue"         val={"$"+data.totalRevenue}       color="text-kaiGreen"/>
+                  <StatBox label="LegaSea Signups" val={data.totalSignups}           color="text-kaiBlue"/>
+                  <StatBox label="Staff Cost"      val={"$"+data.totalStaffCost}     color="text-kaiBlue" sub="@ $30/hr"/>
+                  <StatBox label="Stock Cost"      val={"$"+data.totalStockCost}     color="text-coffeeBrown" sub="most recent prices"/>
                 </div>
 
                 {/* P&L */}
@@ -1535,7 +1574,7 @@ function DashScreen({webAppUrl,onBack}){
             <div className="bg-kaiBurgundy text-white px-5 py-4 rounded-t-2xl flex justify-between items-start">
               <div>
                 <div className="font-serif font-bold text-lg">{detail.eventName}</div>
-                <div className="text-xs text-white/60 mt-0.5">{detail.date}{detail.location?` · ${detail.location}`:""}</div>
+                <div className="text-xs text-white/60 mt-0.5">{detail.date}{detail.location?` · ${detail.location}`:""}{detail.completedBy?` · ${detail.completedBy}`:""}</div>
               </div>
               <Btn onClick={()=>setDetail(null)} className="text-white/70 hover:text-white text-xl font-bold ml-4">✕</Btn>
             </div>
@@ -1586,9 +1625,10 @@ function DashScreen({webAppUrl,onBack}){
                   ))}
                 </div>
               )}
-              {(detail.equipmentIssues||detail.notes)&&(
+              {(detail.signups>0||detail.equipmentIssues||detail.notes)&&(
                 <div>
                   <div className="text-xs font-semibold text-gray-500 mb-2">Notes</div>
+                  {detail.signups>0&&<p className="text-sm text-gray-700 mb-1"><span className="font-medium">LegaSea Signups:</span> {detail.signups}</p>}
                   {detail.equipmentIssues&&<p className="text-sm text-gray-700 mb-1"><span className="font-medium">Issues:</span> {detail.equipmentIssues}</p>}
                   {detail.notes&&<p className="text-sm text-gray-700"><span className="font-medium">Notes:</span> {detail.notes}</p>}
                 </div>
