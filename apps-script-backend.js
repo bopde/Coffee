@@ -50,7 +50,8 @@ const SR_HEADERS=[
   'Fridge Time',      // 17
   'Fridge Temp (C)',  // 18
   'Issues',           // 19
-  'Notes'             // 20
+  'Notes',            // 20
+  'LegaSea Signups'   // 21
 ];
 // Named indices (matches SR_HEADERS above)
 const I={
@@ -60,9 +61,9 @@ const I={
   cash:12,eftpos:13,total:14,
   stItem:15,stQty:16,
   fTime:17,fTemp:18,
-  issues:19,notes:20
+  issues:19,notes:20,signups:21
 };
-const SR_WIDTH=SR_HEADERS.length; // 21
+const SR_WIDTH=SR_HEADERS.length; // 22
 
 const SL_HEADERS=['Item','Current Level','Last Updated'];
 const RL_HEADERS=['Date','Supplier','Item','Qty','Cost Per Unit','Total Cost','Logged At'];
@@ -145,8 +146,8 @@ function handleSalesReport(p){
   });
 
   // Notes row (only if content present)
-  const issues=gp('issues',0), notes=gp('notes',0);
-  if(issues||notes) sheet.appendRow(row('NOTES',{issues:issues,notes:notes}));
+  const issues=gp('issues',0), notes=gp('notes',0), signups=gp('legaseaSignups',0);
+  if(issues||notes||signups) sheet.appendRow(row('NOTES',{issues:issues,notes:notes,signups:signups}));
 
   return jsonResp({success:true});
 }
@@ -170,10 +171,15 @@ function buildReorderLog(ss){
   const sheet = getOrCreateSheet(ss,'ReorderLog',RL_HEADERS);
   const rows  = sheet.getDataRange().getValues();
   const map   = {};
+  const tz=Session.getScriptTimeZone();
   for(let i=1;i<rows.length;i++){
     const[date,supplier,item,qty,cpu,totalCost]=rows[i];
-    const key=`${date}||${supplier}`;
-    if(!map[key]) map[key]={date:String(date).slice(0,10),supplier:String(supplier),items:[],totalCost:0};
+    const dateStr=date instanceof Date
+      ? Utilities.formatDate(date,tz,'yyyy-MM-dd')
+      : String(date).slice(0,10);
+    if(!dateStr||dateStr.length<8) continue;
+    const key=`${dateStr}||${supplier}`;
+    if(!map[key]) map[key]={date:dateStr,supplier:String(supplier),items:[],totalCost:0};
     map[key].items.push({item:String(item),qty:parseFloat(qty)||0,costPerUnit:parseFloat(cpu)||0});
     map[key].totalCost+=parseFloat(totalCost)||0;
   }
@@ -287,7 +293,7 @@ function handleDashboard(){
         completedBy:String(r[I.by]),
         totalSales:0, cashSales:'', eftposSales:'',
         staff:[], sales:[], stockUsed:[],
-        equipmentIssues:'', notes:'',
+        equipmentIssues:'', notes:'', signups:0,
         staffCost:0, stockCost:0
       };
     }
@@ -302,7 +308,7 @@ function handleDashboard(){
       ev.sales.push({product:String(r[I.prod]),qty:parseFloat(r[I.qty])||0});
     }
     if(type==='SALES_TOTAL'){
-      ev.totalSales  =parseFloat(r[I.total])||0;
+      ev.totalSales  +=(parseFloat(r[I.total])||0);
       ev.cashSales   =String(r[I.cash]);
       ev.eftposSales =String(r[I.eftpos]);
     }
@@ -313,8 +319,9 @@ function handleDashboard(){
       ev.stockCost+=qty*(cpuMap[item]||0);
     }
     if(type==='NOTES'){
-      ev.equipmentIssues=String(r[I.issues]||'');
-      ev.notes          =String(r[I.notes] ||'');
+      ev.equipmentIssues=String(r[I.issues]  ||'');
+      ev.notes          =String(r[I.notes]   ||'');
+      ev.signups        =(parseInt(r[I.signups])||0)+ev.signups;
     }
   }
 
